@@ -543,98 +543,90 @@ class PerfectedInformationBottleneck:
         results: Dictionary mapping beta values to (I(Z;X), I(Z;Y)) tuples
         """
         results = {}
-            
+        
         # Define critical zone width based on depth
         critical_zone_width = 0.03 / depth # Narrower critical zone with increasing depth
-            
+        
         # Sort beta values for better continuation
         beta_values = np.sort(beta_values)
         
-        # BUGFIX: Use a proper progress bar with thread-safe updates
-        # Create a custom tqdm progress bar with initial total
-        total_evaluations = len(beta_values)
-        
         # Initialize progress counters
         self._current_progress = 0
-        self._total_progress = total_evaluations
+        self._total_progress = len(beta_values)
         
-        # BUGFIX: Helper function for optimization with controlled thread usage
+        # BUGFIX: Inner function for optimization with controlled thread usage
         def optimize_beta(beta):
+            """Optimize for a single beta value with strict resource management"""
             # Check proximity to theoretical target
             proximity = abs(beta - self.target_beta_star)
             
-            # Adaptive number of runs based on proximity to target
-            if proximity < critical_zone_width:
-                n_runs = min(3, self.max_workers)  # BUGFIX: Limit runs to max_workers
-            elif proximity < critical_zone_width * 3:
-                n_runs = min(2, self.max_workers)  # BUGFIX: Limit runs to max_workers
-            else:
-                n_runs = 1  # Single run far from target
+            # Use only ONE run most of the time to prevent resource exhaustion
+            n_runs = 1  # Default to single run
+            if proximity < 0.01:  # Only use multiple runs for very close values
+                n_runs = 2  # Maximum 2 runs even for critical values
             
-            # Run optimization for this beta, multiple times for critical zone
+            # Cap iterations more aggressively
+            max_iterations = 1000  # Reduced from 1500/2000
+            
+            # Results storage
             izx_values = []
             izy_values = []
             
-            # Use a semaphore to limit concurrent optimizations
-            global_semaphore = threading.BoundedSemaphore(value=min(4, self.max_workers))
+            # Run optimization sequentially with strict timeout
+            start_time = time.time()
+            timeout_per_run = 120  # 2 minutes max per run
             
-            # BUGFIX: Use sequential runs for stability and resource control
-            with global_semaphore:  # Acquire semaphore to limit concurrency
+            with THREAD_LOCK:  # Thread-safe random state access
+                orig_state = np.random.get_state()
+            
+            try:
                 for run in range(n_runs):
-                    # Add timeout protection
-                    start_time = time.time()
-                    max_run_time = 300  # 5 minutes per run
-                    
-                    # Initialize with different random seed each time
-                    with THREAD_LOCK:  # BUGFIX: Thread-safe random state manipulation
-                        orig_state = np.random.get_state()
+                    run_start = time.time()
+                    if time.time() - start_time > timeout_per_run:
+                        print(f"⏱️ Timeout for beta={beta}, stopping after {run} runs")
+                        break
+                        
+                    with THREAD_LOCK:
                         np.random.seed(np.random.randint(0, 10000))
                     
-                    # Use more iterations and tighter tolerance near target
-                    max_iterations = 1500  # Reduced from 2000
-                    local_tolerance = self.tolerance * 0.1 if proximity < critical_zone_width else self.tolerance
-                    
                     try:
-                        # Optimize with enhanced parameters
+                        # Use reduced iterations and simplified parameters
                         _, mi_zx, mi_zy = self.optimize_encoder(
                             beta, 
-                            use_staged=True,
+                            use_staged=False,  # Simplify to reduce complexity
                             max_iterations=max_iterations,
-                            tolerance=local_tolerance
+                            tolerance=self.tolerance
                         )
                         
-                        # Check timeout
-                        if time.time() - start_time > max_run_time:
-                            print(f"Optimization for beta={beta} took too long, stopping")
-                            break
-                            
                         izx_values.append(mi_zx)
                         izy_values.append(mi_zy)
+                        
                     except Exception as e:
                         print(f"Error optimizing beta={beta}, run={run}: {str(e)}")
-                    
-                    # Restore random state
-                    with THREAD_LOCK:  # BUGFIX: Thread-safe random state manipulation
-                        np.random.set_state(orig_state)
+                        
+                    # Check run timeout
+                    if time.time() - run_start > timeout_per_run / n_runs:
+                        print(f"Run timeout for beta={beta}, run {run+1}")
+                        break
+            finally:
+                # Always restore random state
+                with THREAD_LOCK:
+                    np.random.set_state(orig_state)
             
-            # Store average of runs (weighted toward non-trivial solutions)
-            # This helps avoid numerical issues at the phase transition
-            if any(izx > self.min_izx_threshold for izx in izx_values):
-                # Filter out trivial solutions
-                valid_idx = [i for i, izx in enumerate(izx_values) if izx > self.min_izx_threshold]
-                avg_izx = np.mean([izx_values[i] for i in valid_idx])
-                avg_izy = np.mean([izy_values[i] for i in valid_idx])
-            else:
-                # If all solutions are trivial, use standard average
-                avg_izx = np.mean(izx_values) if izx_values else 0.0
-                avg_izy = np.mean(izy_values) if izy_values else 0.0
+            # Calculate results (handling empty case)
+            if not izx_values:
+                return beta, (0.0, 0.0)  # Return zeros for failed optimization
+                
+            # Calculate average values
+            avg_izx = np.mean(izx_values)
+            avg_izy = np.mean(izy_values)
             
-            # Update progress bar
+            # Update progress
             with self._progress_lock:
                 self._current_progress += 1
                 progress_pct = int(100 * self._current_progress / self._total_progress)
                 
-                # Force update at regular intervals regardless of percentage
+                # Force update at regular intervals
                 time_now = time.time()
                 if not hasattr(self, '_last_progress_time'):
                     self._last_progress_time = time_now
@@ -649,40 +641,50 @@ class PerfectedInformationBottleneck:
             
             return beta, (avg_izx, avg_izy)
         
-        # BUGFIX: Process beta values in parallel with controlled thread count
-        # Use batching to avoid excessive memory usage and ensure progress updates
-        batch_size = min(20, len(beta_values))  # Process in batches of 20 or less
-        
+        # Process one batch at a time to avoid overwhelming the system
+        batch_size = min(10, len(beta_values))  # Smaller batch size for better control
         print(f"Processing {len(beta_values)} beta values in batches of {batch_size}")
+        
+        # Create a semaphore to limit concurrent jobs
+        global_semaphore = threading.BoundedSemaphore(value=min(4, self.max_workers))
         
         for i in range(0, len(beta_values), batch_size):
             batch = beta_values[i:i+batch_size]
+            print(f"Processing batch {i//batch_size + 1} of {(len(beta_values) + batch_size - 1)//batch_size}")
             
+            # Process one batch at a time with strict timeout
             futures = []
-            # Use the global thread pool instead of creating a new one
             for beta in batch:
-                futures.append(THREAD_POOL.submit(optimize_beta, beta))
+                # Use a wrapper function to manage the semaphore
+                def submit_with_semaphore(beta):
+                    with global_semaphore:
+                        return optimize_beta(beta)
+                    
+                future = THREAD_POOL.submit(submit_with_semaphore, beta)
+                futures.append(future)
             
-            # Process results with timeouts
-            batch_timeout = time.time() + 600  # 10 minutes max for entire batch
-            for future in as_completed(futures):
+            # Process batch results with firm timeout
+            batch_timeout = 300  # 5 minutes max per batch
+            batch_start = time.time()
+            completed = 0
+            
+            for future in as_completed(futures, timeout=batch_timeout):
                 try:
-                    # Calculate remaining time for this future
-                    remaining_time = max(1, batch_timeout - time.time())  # At least 1 second
-                    beta, result = future.result(timeout=remaining_time)
+                    beta, result = future.result(timeout=60)  # 1-minute timeout per task
                     results[beta] = result
+                    completed += 1
+                    print(f"Completed {completed}/{len(batch)} in batch {i//batch_size + 1}")
                 except TimeoutError:
-                    print(f"Timeout processing a beta value")
+                    print(f"⚠️ Task timeout in batch {i//batch_size + 1}")
                 except Exception as e:
-                    print(f"Error processing beta value: {str(e)}")
+                    print(f"❌ Error in batch {i//batch_size + 1}: {str(e)}")
                 
-                # Check if overall batch timeout exceeded
-                if time.time() > batch_timeout:
-                    print("Batch timeout exceeded, some values may not be processed")
+                # Check overall batch timeout
+                if time.time() - batch_start > batch_timeout:
+                    print(f"⚠️ Batch {i//batch_size + 1} timeout exceeded, moving to next batch")
                     break
         
-        # Ensure final progress update and newline
-        print(f"Evaluating β values: 100% | {self._total_progress}/{self._total_progress}    ")
+        print(f"Evaluating β values: 100% | {self._total_progress}/{self._total_progress}")
         
         return results
 
@@ -2071,7 +2073,7 @@ class PerfectedInformationBottleneck:
      
     ### ENHANCEMENT: Improved single beta optimization
     def _optimize_single_beta(self, p_z_given_x_init: np.ndarray, beta: float, 
-        max_iterations: int = 1500, tolerance: float = 1e-10,
+        max_iterations: int = 1000, tolerance: float = 1e-10,
         verbose: bool = False) -> Tuple[np.ndarray, float, float]:
         """
         Optimize encoder for a single beta value (single ∇φ application)
@@ -2079,9 +2081,9 @@ class PerfectedInformationBottleneck:
         Args:
         p_z_given_x_init: Initial encoder p(z|x)
         beta: IB trade-off parameter β
-        max_iterations: Maximum iterations per stage
-        tolerance: Convergence tolerance (ultra-high precision)
-        verbose: Whether to print details
+        max_iterations: Maximum number of iterations (reduced from 1500)
+        tolerance: Convergence tolerance
+        verbose: Whether to print progress
         
         Returns:
         p_z_given_x: Optimized encoder
@@ -2089,27 +2091,37 @@ class PerfectedInformationBottleneck:
         mi_zy: Final I(Z;Y)
         """
         p_z_given_x = p_z_given_x_init.copy()
-            
+        
         # Calculate initial values
         p_z, _ = self.calculate_marginal_z(p_z_given_x)
         mi_zx = self.calculate_mi_zx(p_z_given_x, p_z)
         mi_zy = self.calculate_mi_zy(p_z_given_x)
         objective = mi_zy - beta * mi_zx
-            
+        
         prev_objective = objective - 2*tolerance # Ensure first iteration runs
-            
+        
         # Optimization loop
         iteration = 0
         converged = False
-            
+        early_stop_threshold = 100  # Check for stalled progress every 100 iterations
+        
         # Track historical values for stability checking
-        mi_zx_history = [mi_zx]
         obj_history = [objective]
-            
+        
         # Adaptive damping factor
         damping = 0.05 # Start with small damping
-            
+        
+        # Maximum runtime for this optimization
+        start_time = time.time()
+        max_runtime = 60  # 1 minute maximum
+        
         while iteration < max_iterations and not converged:
+            # Check for timeout
+            if time.time() - start_time > max_runtime:
+                if verbose:
+                    print(f" Stopping after {iteration} iterations due to timeout")
+                break
+                
             iteration += 1
             
             # Update p(z|x) using IB update equation
@@ -2133,9 +2145,6 @@ class PerfectedInformationBottleneck:
             mi_zx = self.calculate_mi_zx(p_z_given_x, p_z)
             mi_zy = self.calculate_mi_zy(p_z_given_x)
             
-            # Track history
-            mi_zx_history.append(mi_zx)
-            
             # Calculate IB objective
             objective = mi_zy - beta * mi_zx
             obj_history.append(objective)
@@ -2143,12 +2152,14 @@ class PerfectedInformationBottleneck:
             if verbose and (iteration % (max_iterations // 10) == 0 or iteration == max_iterations-1):
                 print(f" [Iter {iteration}] I(Z;X)={mi_zx:.6f}, I(Z;Y)={mi_zy:.6f}, Obj={objective:.6f}")
             
-            # Early stopping for slow convergence
-            if iteration > 500 and abs(objective - obj_history[-500]) < tolerance * 10:
-                if verbose:
-                    print(f" Early stopping: slow convergence detected after {iteration} iterations")
-                converged = True
-                break
+            # Early stopping for slow convergence - check every 100 iterations
+            if iteration > early_stop_threshold and iteration % early_stop_threshold == 0:
+                # Check if we're making meaningful progress
+                if abs(objective - obj_history[-early_stop_threshold]) < tolerance * 5:
+                    if verbose:
+                        print(f" Early stopping: slow convergence detected after {iteration} iterations")
+                    converged = True
+                    break
             
             # Check for oscillation and apply stronger damping if needed
             if iteration > 5:
@@ -2157,13 +2168,11 @@ class PerfectedInformationBottleneck:
                     # If oscillating, increase damping significantly
                     damping = min(damping * 2, 0.8)
             
-            # Check convergence with ultra-high precision tolerance
+            # Check convergence with precision tolerance
             if abs(objective - prev_objective) < tolerance:
                 # Additional check: verify stable over multiple iterations
                 if iteration > 3 and all(abs(o - objective) < tolerance for o in obj_history[-3:]):
                     converged = True
-                    if verbose and iteration % (max_iterations // 10) != 0:
-                        print(f" [Iter {iteration}] I(Z;X)={mi_zx:.6f}, I(Z;Y)={mi_zy:.6f}, Obj={objective:.6f}")
                     if verbose:
                         print(f" Converged after {iteration} iterations, ΔObj = {abs(objective - prev_objective):.2e}")
                     break
@@ -2181,10 +2190,10 @@ class PerfectedInformationBottleneck:
                 objective = mi_zy - beta * mi_zx
             
             prev_objective = objective
-            
+        
         if not converged and verbose:
-            print(f" WARNING: Did not converge after {max_iterations} iterations, ΔObj = {abs(objective - prev_objective):.2e}")
-            
+            print(f" WARNING: Did not converge after {iteration} iterations")
+        
         self.current_encoder = p_z_given_x
         return p_z_given_x, mi_zx, mi_zy
 
