@@ -1,3 +1,10 @@
+import os
+# Force single-threaded mode for numerical libraries 
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import numpy as np
 from typing import Tuple, List, Dict, Union, Optional, Callable, Any
 import warnings
@@ -37,7 +44,6 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(min(8, multiprocessing.cpu_count()))
 
 # BUGFIX: Global thread pool for controlled parallelism
 MAX_WORKERS = min(8, multiprocessing.cpu_count())
-THREAD_POOL = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 # Create a lock for thread safety
 THREAD_LOCK = threading.RLock()
 
@@ -545,7 +551,7 @@ class PerfectedInformationBottleneck:
         results = {}
         
         # Define critical zone width based on depth
-        critical_zone_width = 0.03 / depth # Narrower critical zone with increasing depth
+        critical_zone_width = 0.03 / depth  # Narrower critical zone with increasing depth
         
         # Sort beta values for better continuation
         beta_values = np.sort(beta_values)
@@ -554,7 +560,7 @@ class PerfectedInformationBottleneck:
         self._current_progress = 0
         self._total_progress = len(beta_values)
         
-        # BUGFIX: Inner function for optimization with controlled thread usage
+        # Define the optimize_beta function inside search_beta_values
         def optimize_beta(beta):
             """Optimize for a single beta value with strict resource management"""
             # Check proximity to theoretical target
@@ -642,47 +648,65 @@ class PerfectedInformationBottleneck:
             return beta, (avg_izx, avg_izy)
         
         # Process one batch at a time to avoid overwhelming the system
-        batch_size = min(10, len(beta_values))  # Smaller batch size for better control
+        batch_size = min(5, len(beta_values))  # Even smaller batch size for better control
         print(f"Processing {len(beta_values)} beta values in batches of {batch_size}")
         
         # Create a semaphore to limit concurrent jobs
-        global_semaphore = threading.BoundedSemaphore(value=min(4, self.max_workers))
+        global_semaphore = threading.BoundedSemaphore(value=4)
         
         for i in range(0, len(beta_values), batch_size):
             batch = beta_values[i:i+batch_size]
             print(f"Processing batch {i//batch_size + 1} of {(len(beta_values) + batch_size - 1)//batch_size}")
             
-            # Process one batch at a time with strict timeout
-            futures = []
-            for beta in batch:
-                # Use a wrapper function to manage the semaphore
-                def submit_with_semaphore(beta):
-                    with global_semaphore:
-                        return optimize_beta(beta)
-                    
-                future = THREAD_POOL.submit(submit_with_semaphore, beta)
-                futures.append(future)
-            
-            # Process batch results with firm timeout
-            batch_timeout = 300  # 5 minutes max per batch
-            batch_start = time.time()
-            completed = 0
-            
-            for future in as_completed(futures, timeout=batch_timeout):
-                try:
-                    beta, result = future.result(timeout=60)  # 1-minute timeout per task
-                    results[beta] = result
-                    completed += 1
-                    print(f"Completed {completed}/{len(batch)} in batch {i//batch_size + 1}")
-                except TimeoutError:
-                    print(f"⚠️ Task timeout in batch {i//batch_size + 1}")
-                except Exception as e:
-                    print(f"❌ Error in batch {i//batch_size + 1}: {str(e)}")
+            # IMPORTANT: Create a new executor for each batch with context manager
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                # Process one batch at a time with strict timeout
+                futures = []
                 
-                # Check overall batch timeout
-                if time.time() - batch_start > batch_timeout:
-                    print(f"⚠️ Batch {i//batch_size + 1} timeout exceeded, moving to next batch")
-                    break
+                # Better semaphore management with try/finally
+                def process_with_semaphore(beta):
+                    try:
+                        global_semaphore.acquire()
+                        return optimize_beta(beta)
+                    finally:
+                        global_semaphore.release()
+                
+                # Submit all jobs in this batch
+                for beta in batch:
+                    futures.append(executor.submit(process_with_semaphore, beta))
+                
+                # Process batch results with firm timeout
+                batch_timeout = 300  # 5 minutes max per batch
+                batch_start = time.time()
+                completed = 0
+                
+                # Process results with proper cancellation
+                for future in as_completed(futures, timeout=batch_timeout):
+                    try:
+                        beta, result = future.result(timeout=60)  # 1-minute timeout per task
+                        results[beta] = result
+                        completed += 1
+                        print(f"Completed {completed}/{len(batch)} in batch {i//batch_size + 1}")
+                    except TimeoutError:
+                        print(f"⚠️ Task timeout in batch {i//batch_size + 1}")
+                        future.cancel()  # Cancel the task to release resources
+                    except Exception as e:
+                        print(f"❌ Error in batch {i//batch_size + 1}: {str(e)}")
+                        future.cancel()  # Cancel on error too
+                    
+                    # Check overall batch timeout
+                    if time.time() - batch_start > batch_timeout:
+                        print(f"⚠️ Batch {i//batch_size + 1} timeout exceeded, moving to next batch")
+                        # Cancel any remaining futures
+                        for f in futures:
+                            if not f.done():
+                                f.cancel()
+                        break
+            
+            # Force cleanup between batches
+            import gc
+            gc.collect()
+            time.sleep(0.5)  # Small delay to ensure resources are released
         
         print(f"Evaluating β values: 100% | {self._total_progress}/{self._total_progress}")
         
@@ -2116,8 +2140,8 @@ class PerfectedInformationBottleneck:
         max_runtime = 60  # 1 minute maximum
         
         while iteration < max_iterations and not converged:
-            # Check for timeout
-            if time.time() - start_time > max_runtime:
+            # Check for timeout more frequently (every 10 iterations)
+            if iteration % 10 == 0 and time.time() - start_time > max_runtime:
                 if verbose:
                     print(f" Stopping after {iteration} iterations due to timeout")
                 break
@@ -4032,6 +4056,35 @@ def run_benchmarks(ib: PerfectedInformationBottleneck, verbose: bool = True) -> 
     return beta_star, results
 
 
+# Final resource cleanup to ensure all threads terminate
+import atexit
+import gc
+
+def cleanup_resources():
+    """Ensure all resources are properly cleaned up on exit."""
+    gc.collect()
+    
+    # If using multiprocessing, terminate all active processes
+    import multiprocessing
+    if hasattr(multiprocessing, 'active_children'):
+        for child in multiprocessing.active_children():
+            child.terminate()
+    
+    # Force Python to clean up thread resources
+    import threading
+    for thread in threading.enumerate():
+        if thread is not threading.current_thread():
+            if hasattr(thread, "_stop"):
+                try:
+                    thread._stop()
+                except:
+                    pass
+    
+    # One final garbage collection pass
+    gc.collect()
+            
+atexit.register(cleanup_resources)
+
 def simple_demo():
     """
     Run a simple demonstration of the enhanced IB framework
@@ -4052,7 +4105,20 @@ def simple_demo():
     print(f"Error from target: {abs(beta_star - ib.target_beta_star):.8f} "
        f"({abs(beta_star - ib.target_beta_star) / ib.target_beta_star * 100:.6f}%)")
     print(f"\nDetailed visualizations saved to 'ib_plots/' directory")
-
+    
+    # Ensure resources are released before exit
+    gc.collect()
 
 if __name__ == "__main__":
-    simple_demo()
+    try:
+        simple_demo()
+    except KeyboardInterrupt:
+        print("\nDemo interrupted by user. Cleaning up resources...")
+        cleanup_resources()
+    except Exception as e:
+        print(f"\nError occurred: {str(e)}")
+        cleanup_resources()
+    finally:
+        # One last cleanup to ensure all resources are freed
+        cleanup_resources()
+        print("Demo completed. All resources released.")
