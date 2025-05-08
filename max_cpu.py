@@ -2381,14 +2381,14 @@ class PerfectedInformationBottleneck:
                 
             return p_z_given_x, mi_zx, mi_zy
 
-        ### ENHANCEMENT: Improved encoder optimization
-        def optimize_encoder(self, beta: float, 
-            use_staged: bool = True, # Default to staged optimization
-            max_iterations: int = 3000,
-            tolerance: float = 1e-12,
-            n_initializations: int = 1,
-            verbose: bool = False) -> Tuple[np.ndarray, float, float]:
-            """
+    ### ENHANCEMENT: Improved encoder optimization
+    def optimize_encoder(self, beta: float, 
+        use_staged: bool = True, # Default to staged optimization
+        max_iterations: int = 3000,
+        tolerance: float = 1e-12,
+        n_initializations: int = 1,
+        verbose: bool = False) -> Tuple[np.ndarray, float, float]:
+        """
             Optimize encoder for a given beta using improved optimization strategy
             
             Args:
@@ -2403,34 +2403,34 @@ class PerfectedInformationBottleneck:
             p_z_given_x: Optimized encoder p(z|x)
             mi_zx: Mutual information I(Z;X)
             mi_zy: Mutual information I(Z;Y)
-            """
-            # Calculate proximity to critical region
-            proximity = abs(beta - self.target_beta_star)
-            in_critical_region = proximity < 0.1
+        """
+        # Calculate proximity to critical region
+        proximity = abs(beta - self.target_beta_star)
+        in_critical_region = proximity < 0.1
                 
-            # Always use staged optimization for values near critical region
-            if in_critical_region or use_staged:
-                return self.staged_optimization(
-                    beta,
-                    num_stages=9 if in_critical_region else 7, # More stages for critical region
-                    max_iterations=max_iterations,
-                    tolerance=tolerance,
-                    verbose=verbose
-                )
-                
-            # For values far from critical region, use standard optimization
-            # with appropriate initialization
-            p_z_given_x = self.adaptive_initialization(beta)
-                
-            # Run optimization
-            p_z_given_x, mi_zx, mi_zy = self._optimize_single_beta(
-                p_z_given_x, beta,
+        # Always use staged optimization for values near critical region
+        if in_critical_region or use_staged:
+            return self.staged_optimization(
+                beta,
+                num_stages=9 if in_critical_region else 7, # More stages for critical region
                 max_iterations=max_iterations,
                 tolerance=tolerance,
                 verbose=verbose
             )
                 
-            return p_z_given_x, mi_zx, mi_zy
+        # For values far from critical region, use standard optimization
+        # with appropriate initialization
+        p_z_given_x = self.adaptive_initialization(beta)
+                
+        # Run optimization
+        p_z_given_x, mi_zx, mi_zy = self._optimize_single_beta(
+            p_z_given_x, beta,
+            max_iterations=max_iterations,
+            tolerance=tolerance,
+            verbose=verbose
+        )
+                
+        return p_z_given_x, mi_zx, mi_zy
 
         #--------------------------------------------------------------------------
         # 4. Extended Validation Suite
