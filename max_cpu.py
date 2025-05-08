@@ -2,9 +2,6 @@
 # ORCID: 0009-0009-2207-6528
 # Publication: https://doi.org/10.22541/au.174664105.57850297/v1
 
-def process_with_semaphore_wrapper(beta, self_ref):
-    return self_ref._optimize_single_beta_wrapper(beta)
-
 import os
 import multiprocessing
 # Get full system core count
@@ -49,6 +46,20 @@ mp.mp.dps = 100 # Set mpmath precision to 100 decimal places
 MAX_WORKERS = cpu_count
 # Create a lock for thread safety
 THREAD_LOCK = threading.RLock()
+
+def optimize_beta_wrapper(beta_instance_tuple):
+    """
+    Standalone wrapper function for multiprocessing that takes a tuple of (beta, instance)
+    and returns the result of optimize_beta
+    
+    Args:
+        beta_instance_tuple: Tuple containing (beta_value, ib_instance)
+        
+    Returns:
+        tuple: (beta, optimization_result)
+    """
+    beta, ib_instance = beta_instance_tuple
+    return beta, ib_instance.optimize_beta(beta)
 
 class PerfectedInformationBottleneck:
     """
@@ -182,9 +193,6 @@ class PerfectedInformationBottleneck:
         self._current_progress = 0
         self._total_progress = 0
         self._progress_lock = threading.RLock()
-    
-    def _optimize_single_beta_wrapper(self, beta):
-        return beta, self.optimize_beta(beta)
 
     ### ENHANCEMENT: Improved KL divergence calculation using high precision
     def kl_divergence_log_domain(self, log_p: np.ndarray, log_q: np.ndarray, p: np.ndarray = None) -> float:
@@ -544,8 +552,8 @@ class PerfectedInformationBottleneck:
             return beta_values[max_posterior_idx]
 
     # Define the optimize_beta function inside search_beta_values
-    def optimize_beta(self, beta: float) -> Tuple[float, Tuple[float, float]]:
-        """Optimize for a single beta value with strict resource management (now class-level for multiprocessing)"""
+    def optimize_beta(self, beta: float) -> Tuple[float, float]:
+        """Optimize for a single beta value with strict resource management"""
         proximity = abs(beta - self.target_beta_star)
         is_critical = proximity < 0.15  # Wider critical zone
 
@@ -570,6 +578,7 @@ class PerfectedInformationBottleneck:
         if is_critical:
             timeout_per_run = 600
 
+        # Save original state
         with THREAD_LOCK:
             orig_state = np.random.get_state()
 
@@ -604,7 +613,7 @@ class PerfectedInformationBottleneck:
                 np.random.set_state(orig_state)
 
         if not izx_values:
-            return beta, (0.0, 0.0)
+            return (0.0, 0.0)
 
         avg_izx = np.mean(izx_values)
         avg_izy = np.mean(izy_values)
@@ -624,8 +633,8 @@ class PerfectedInformationBottleneck:
                     end='\r', flush=True)
                 self._last_progress_time = time_now
 
-        return beta, (avg_izx, avg_izy)
-
+        return (avg_izx, avg_izy)
+    
     def search_beta_values(self, beta_values: np.ndarray, depth: int = 1) -> Dict[float, Tuple[float, float]]:
         """
         Process a set of beta values and return optimization results with enhanced accuracy
@@ -652,13 +661,17 @@ class PerfectedInformationBottleneck:
             if is_critical_batch:
                 print(f"!!! CRITICAL BATCH DETECTED !!! - Special handling enabled")
 
+            # Create a list of (beta, self) tuples for the wrapper function
+            beta_instance_tuples = [(beta, self) for beta in batch]
+            
             futures = []
             finished_futures = []
 
-            # Use ProcessPoolExecutor here for true multiprocessing
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                for beta in batch:
-                    futures.append(executor.submit(process_with_semaphore_wrapper, beta, self))
+            # Use ProcessPoolExecutor for true parallelism
+            with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+                # Submit optimization tasks
+                for beta_instance in beta_instance_tuples:
+                    futures.append(executor.submit(optimize_beta_wrapper, beta_instance))
 
                 completed = 0
                 for future in as_completed(futures):
@@ -687,7 +700,7 @@ class PerfectedInformationBottleneck:
 
         print(f"Evaluating β values: 100% | {self._total_progress}/{self._total_progress}")
         return results
-
+    
     ### ENHANCEMENT: Improved transition detection with better theoretical target alignment
     def enhanced_transition_detection(self, results: Dict[float, Tuple[float, float]], 
             threshold: float = 0.05) -> List[Tuple[float, float]]:
