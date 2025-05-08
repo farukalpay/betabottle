@@ -682,7 +682,7 @@ class PerfectedInformationBottleneck:
                 print(f"!!! CRITICAL BATCH DETECTED !!! - Special handling enabled")
             
             # IMPORTANT: Create a new executor for each batch with context manager
-            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor: # Reduced from 4
+            with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor: # Reduced from 4
                 # Process one batch at a time
                 futures = []
                 finished_futures = []
