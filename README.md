@@ -33,7 +33,7 @@ The computational realization is encapsulated entirely within a self-contained P
 
 ## **Validation and Verification Protocols**
 
-Upon execution of the primary script (`poc_beta_star_exact_4.14144.py`), the validation process rigorously confirms:
+Upon execution of the primary script (`validate_beta_star.py`), the validation process rigorously confirms:
 
 * Identification of the critical $\beta^*$ within a computational tolerance of < 0.00001% error from the theoretically derived value (4.14144).
 * Successful completion of a stringent validation suite, specifically evaluating:
