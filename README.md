@@ -5,6 +5,8 @@
 **Date**: May 7, 2025
 **DOI**: [10.22541/au.174664105.57850297/v1](https://doi.org/10.22541/au.174664105.57850297/v1)
 
+This work was originally accomplished using [Alpay Algebra](https://alpay.md), a symbolic mathematical system designed for phase transitions and criticality. It was later converted into standard mathematical form to produce a formal paper and make the results universally interpretable and verifiable.
+
 ---
 
 ## 🧠 Project Summary
