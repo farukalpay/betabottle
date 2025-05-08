@@ -59,13 +59,26 @@ After running `ib_beta_star_validation_v5.py`, the following should occur:
 ## 📁 Repository Structure
 
 ```
-/betabottle/
-├── poc_beta_star_exact_4.14144.py        # ✅ One-file theorem prover for β*
-├── ib_plots/                            # ✅ Generated visualizations (auto-created) ✨ Coming Soon!
+Here is the updated Repository Structure section in clean Markdown format:
+
+## 📁 Repository Structure
+
+betabottle/
+├── betabottle/                          # (Optional) Future modular Python package folder
+│   └── init.py                      # Placeholder for PyPI package setup
+├── ib_plots/                            # ✅ Output plots (auto-generated) -- # Will be added 
+│   ├── multiscale_phase_transition.png # Will be added 
+│   ├── information_plane_dynamics.png # Will be added 
+│   ├── gradient_landscape.png # Will be added 
+│   └── statistical_validation.png # Will be added 
 ├── paper/
-│   └── enhanced_ib_framework.pdf        # 📄 Associated paper for Zenodo/Authorea
+│   └── enhanced_ib_framework.pdf        # 📄 Formal paper submitted to Zenodo / arXiv
 ├── LICENSE                              # MIT License
-└── README.md                            # ✅ You are here Ξ₁
+├── README.md                            # ✅ You are here Ξ₁
+├── poc_beta_star_exact_4.14144.py       # ✅ One-file β* theorem validator
+├── pyproject.toml                       # 📦 PyPI packaging config (name claim only)
+├── .gitignore                           # 🔒 Ignore caches, plots, and venvs
+└── workflow.yml                         # ⚙️ GitHub Actions config (optional future CI)
 ```
 
 ---
