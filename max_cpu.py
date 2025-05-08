@@ -2213,8 +2213,8 @@ class PerfectedInformationBottleneck:
             self.current_encoder = p_z_given_x
             return p_z_given_x, mi_zx, mi_zy
 
-        ### ENHANCEMENT: Improved staged optimization
-        def staged_optimization(self, target_beta: float, 
+    ### ENHANCEMENT: Improved staged optimization
+    def staged_optimization(self, target_beta: float, 
         num_stages: int = 7, # Adjusted based on criticality
         p_z_given_x_init: Optional[np.ndarray] = None,
         max_iterations: int = 3000, # Increased maximum iterations 
