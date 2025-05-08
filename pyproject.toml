@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "betabottle"
 version = "0.0.1"
 description = "Reserved name for upcoming Alpay Algebra-based Information Bottleneck library."
-authors = [{ name="Faruk Alpay", email="farukalpay@protonmail.com" }]
+authors = [{ name="Faruk Alpay", email="alpay@lightcap.ai" }]
 license = {text = "MIT"}
 readme = "README.md"
 classifiers = [
