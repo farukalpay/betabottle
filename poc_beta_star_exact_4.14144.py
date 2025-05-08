@@ -567,24 +567,35 @@ class PerfectedInformationBottleneck:
         # Define the optimize_beta function inside search_beta_values
         def optimize_beta(beta):
             """Optimize for a single beta value with strict resource management"""
-            # Check proximity to theoretical target
+            # Check proximity to theoretical target for special handling
             proximity = abs(beta - self.target_beta_star)
+            is_critical = proximity < 0.15  # Wider critical zone
             
-            # Use only ONE run most of the time to prevent resource exhaustion
+            # Print the beta value being processed
+            if is_critical:
+                print(f"Processing critical β = {beta:.8f} (distance from target: {proximity:.8f})")
+            
+            # Use variable runs based on proximity to target
             n_runs = 1  # Default to single run
-            if proximity < 0.01:  # Only use multiple runs for very close values
-                n_runs = 2  # Maximum 2 runs even for critical values
+            if proximity < 0.01:  # Very close to critical value
+                n_runs = 3  # More runs for very close values
+            elif proximity < 0.1:  # Moderately close
+                n_runs = 2
             
-            # Cap iterations more aggressively
-            max_iterations = 800  # Reduced from 1000
+            # Adjust iterations based on proximity
+            max_iterations = 800  # Default
+            if is_critical:
+                max_iterations = 1500  # More iterations for critical values
             
             # Results storage
             izx_values = []
             izy_values = []
             
-            # Run optimization sequentially with strict timeout
+            # Run optimization with adaptive timeout based on criticality
             start_time = time.time()
-            timeout_per_run = 180  # 3 minutes max per run (increased from 2 min)
+            timeout_per_run = 180  # Default: 3 minutes per run
+            if is_critical:
+                timeout_per_run = 600  # 10 minutes for critical values
             
             with THREAD_LOCK:  # Thread-safe random state access
                 orig_state = np.random.get_state()
@@ -600,10 +611,10 @@ class PerfectedInformationBottleneck:
                         np.random.seed(np.random.randint(0, 10000))
                     
                     try:
-                        # Use reduced iterations and simplified parameters
+                        # Use staged optimization for critical values
                         _, mi_zx, mi_zy = self.optimize_encoder(
                             beta, 
-                            use_staged=False,  # Simplify to reduce complexity
+                            use_staged=is_critical,  # Use staged optimization for critical values
                             max_iterations=max_iterations,
                             tolerance=self.tolerance
                         )
@@ -651,21 +662,34 @@ class PerfectedInformationBottleneck:
             
             return beta, (avg_izx, avg_izy)
         
-        # Process one batch at a time to avoid overwhelming the system
-        batch_size = min(5, len(beta_values))  # Even smaller batch size for better control
+        # Process one batch at a time with adaptive batch size
+        # Use smaller batches for critical values
+        batch_size = min(5, len(beta_values))
         print(f"Processing {len(beta_values)} beta values in batches of {batch_size}")
         
         # Create a semaphore to limit concurrent jobs
-        global_semaphore = threading.BoundedSemaphore(value=4)
+        # Reduce concurrency for better stability
+        global_semaphore = threading.BoundedSemaphore(value=3)  # Reduced from 4
         
+        batch_index = 0
         for i in range(0, len(beta_values), batch_size):
+            batch_index += 1
             batch = beta_values[i:i+batch_size]
-            print(f"Processing batch {i//batch_size + 1} of {(len(beta_values) + batch_size - 1)//batch_size}")
+            
+            # Check if this is a critical batch (containing values near β*)
+            is_critical_batch = any(abs(beta - self.target_beta_star) < 0.15 for beta in batch)
+            
+            # Print batch details for debugging
+            print(f"Processing batch {batch_index} of {(len(beta_values) + batch_size - 1)//batch_size}")
+            print(f"Batch {batch_index} betas:", [f"{beta:.8f}" for beta in batch])
+            if is_critical_batch:
+                print(f"!!! CRITICAL BATCH DETECTED !!! - Special handling enabled")
             
             # IMPORTANT: Create a new executor for each batch with context manager
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                # Process one batch at a time with strict timeout
+            with ThreadPoolExecutor(max_workers=3) as executor:  # Reduced from 4
+                # Process one batch at a time
                 futures = []
+                finished_futures = []
                 
                 # Better semaphore management with try/finally
                 def process_with_semaphore(beta):
@@ -679,47 +703,43 @@ class PerfectedInformationBottleneck:
                 for beta in batch:
                     futures.append(executor.submit(process_with_semaphore, beta))
                 
-                # Process batch results with firm timeout - INCREASED TIMEOUT
-                batch_timeout = 900  # 15 minutes max per batch (increased from 5 min)
-                batch_start = time.time()
+                # Process results without global batch timeout
+                # This is the key change - we're removing the as_completed(..., timeout=batch_timeout)
+                # and instead managing timeouts at the individual task level
                 completed = 0
                 
-                # Process results with proper cancellation
-                try:
-                    for future in as_completed(futures, timeout=batch_timeout):
-                        try:
-                            beta, result = future.result(timeout=240)  # 4-minute timeout per task (increased from 1 min)
-                            results[beta] = result
-                            completed += 1
-                            print(f"Completed {completed}/{len(batch)} in batch {i//batch_size + 1}")
-                        except TimeoutError:
-                            print(f"⚠️ Task timeout in batch {i//batch_size + 1}")
-                            future.cancel()  # Cancel the task to release resources
-                        except Exception as e:
-                            print(f"❌ Error in batch {i//batch_size + 1}: {str(e)}")
-                            future.cancel()  # Cancel on error too
+                # Process futures without global timeout
+                for future in as_completed(futures):  # No global timeout here
+                    try:
+                        # Individual task timeout based on criticality
+                        task_timeout = 600  # 10 minutes per task by default
+                        if is_critical_batch:
+                            task_timeout = 1200  # 20 minutes for critical tasks
                         
-                        # Check overall batch timeout
-                        if time.time() - batch_start > batch_timeout:
-                            print(f"⚠️ Batch {i//batch_size + 1} timeout exceeded, moving to next batch")
-                            # Cancel any remaining futures
-                            for f in futures:
-                                if not f.done():
-                                    f.cancel()
-                            break
-                except Exception as e:
-                    # Handle batch-level exceptions
-                    unfinished = sum(1 for f in futures if not f.done())
-                    print(f"❌ Error in batch {i//batch_size + 1}: {str(e)} - {unfinished} (of {len(futures)}) futures unfinished")
-                    # Cancel any remaining futures
-                    for f in futures:
-                        if not f.done():
-                            f.cancel()
+                        # Get result with per-task timeout
+                        beta, result = future.result(timeout=task_timeout)
+                        results[beta] = result
+                        finished_futures.append(future)
+                        completed += 1
+                        print(f"Completed {completed}/{len(batch)} in batch {batch_index}")
+                    except TimeoutError:
+                        print(f"⚠️ Task timeout in batch {batch_index}")
+                    except Exception as e:
+                        print(f"❌ Error in task in batch {batch_index}: {str(e)}")
+                
+                # Check if we have any unfinished futures
+                unfinished = [f for f in futures if f not in finished_futures]
+                if unfinished:
+                    print(f"⚠️ Batch {batch_index} has {len(unfinished)} unfinished tasks out of {len(futures)}")
+                    # Try to cancel them, but don't fail the entire operation
+                    for f in unfinished:
+                        f.cancel()
             
-            # Force cleanup between batches
+            # Extra cleanup between batches
             import gc
             gc.collect()
-            time.sleep(1.0)  # Increased delay to ensure resources are released
+            # Longer delay after critical batches
+            time.sleep(2.0 if is_critical_batch else 1.0)
         
         print(f"Evaluating β values: 100% | {self._total_progress}/{self._total_progress}")
         
@@ -2129,6 +2149,9 @@ class PerfectedInformationBottleneck:
         """
         p_z_given_x = p_z_given_x_init.copy()
         
+        # Check if this is a critical beta value
+        is_critical = abs(beta - self.target_beta_star) < 0.15
+        
         # Calculate initial values
         p_z, _ = self.calculate_marginal_z(p_z_given_x)
         mi_zx = self.calculate_mi_zx(p_z_given_x, p_z)
@@ -2140,21 +2163,29 @@ class PerfectedInformationBottleneck:
         # Optimization loop
         iteration = 0
         converged = False
-        early_stop_threshold = 100  # Check for stalled progress every 100 iterations
+        
+        # Adaptive early stopping based on criticality
+        early_stop_threshold = 50 if is_critical else 100
         
         # Track historical values for stability checking
         obj_history = [objective]
         
-        # Adaptive damping factor
-        damping = 0.05 # Start with small damping
+        # Adaptive damping factor - gentler for critical values
+        damping = 0.03 if is_critical else 0.05
         
-        # Maximum runtime for this optimization
+        # Adaptive runtime based on criticality
         start_time = time.time()
-        max_runtime = 120  # 2 minutes maximum (increased from 1 min)
+        max_runtime = 300 if is_critical else 120  # 5 minutes for critical, 2 minutes otherwise
+        
+        # Frequent timeout check interval
+        timeout_check_interval = 5
+        
+        # Allow more oscillation for critical values before increasing damping
+        oscillation_threshold = tolerance * 20 if is_critical else tolerance * 10
         
         while iteration < max_iterations and not converged:
-            # Check for timeout more frequently (every 5 iterations)
-            if iteration % 5 == 0 and time.time() - start_time > max_runtime:
+            # Check for timeout more frequently
+            if iteration % timeout_check_interval == 0 and time.time() - start_time > max_runtime:
                 if verbose:
                     print(f" Stopping after {iteration} iterations due to timeout")
                 break
@@ -2164,15 +2195,17 @@ class PerfectedInformationBottleneck:
             # Update p(z|x) using IB update equation
             new_p_z_given_x = self.ib_update_step(p_z_given_x, beta)
             
-            # Apply damping for stability
+            # Apply adaptive damping for stability
             if iteration > 1:
                 # Check if objective is improving
                 if objective <= prev_objective:
-                    # If not improving, increase damping
-                    damping = min(damping * 1.2, 0.5) # Cap at 0.5
+                    # If not improving, increase damping more gradually for critical values
+                    damping_increase = 1.1 if is_critical else 1.2
+                    damping = min(damping * damping_increase, 0.5)
                 else:
-                    # If improving, reduce damping
-                    damping = max(damping * 0.9, 0.01) # Don't go below 0.01
+                    # If improving, reduce damping more gradually for critical values
+                    damping_decrease = 0.95 if is_critical else 0.9
+                    damping = max(damping * damping_decrease, 0.01)
             
             # Apply damping
             p_z_given_x = (1 - damping) * new_p_z_given_x + damping * p_z_given_x
@@ -2189,10 +2222,11 @@ class PerfectedInformationBottleneck:
             if verbose and (iteration % (max_iterations // 10) == 0 or iteration == max_iterations-1):
                 print(f" [Iter {iteration}] I(Z;X)={mi_zx:.6f}, I(Z;Y)={mi_zy:.6f}, Obj={objective:.6f}")
             
-            # Early stopping for slow convergence - check every 100 iterations
+            # Early stopping for slow convergence - check every early_stop_threshold iterations
             if iteration > early_stop_threshold and iteration % early_stop_threshold == 0:
                 # Check if we're making meaningful progress
-                if abs(objective - obj_history[-early_stop_threshold]) < tolerance * 5:
+                progress_threshold = tolerance * 3 if is_critical else tolerance * 5
+                if abs(objective - obj_history[-early_stop_threshold]) < progress_threshold:
                     if verbose:
                         print(f" Early stopping: slow convergence detected after {iteration} iterations")
                     converged = True
@@ -2201,14 +2235,16 @@ class PerfectedInformationBottleneck:
             # Check for oscillation and apply stronger damping if needed
             if iteration > 5:
                 recent_diff = np.abs(np.diff(obj_history[-5:]))
-                if np.any(recent_diff > tolerance * 10):
-                    # If oscillating, increase damping significantly
-                    damping = min(damping * 2, 0.8)
+                if np.any(recent_diff > oscillation_threshold):
+                    # If oscillating, increase damping significantly but more gently for critical values
+                    damping_factor = 1.5 if is_critical else 2.0
+                    damping = min(damping * damping_factor, 0.8)
             
             # Check convergence with precision tolerance
+            # For critical values, require more iterations of stability
+            stability_window = 5 if is_critical else 3
             if abs(objective - prev_objective) < tolerance:
-                # Additional check: verify stable over multiple iterations
-                if iteration > 3 and all(abs(o - objective) < tolerance for o in obj_history[-3:]):
+                if iteration > stability_window and all(abs(o - objective) < tolerance for o in obj_history[-stability_window:]):
                     converged = True
                     if verbose:
                         print(f" Converged after {iteration} iterations, ΔObj = {abs(objective - prev_objective):.2e}")
@@ -2236,29 +2272,39 @@ class PerfectedInformationBottleneck:
 
     ### ENHANCEMENT: Improved staged optimization
     def staged_optimization(self, target_beta: float, 
-          num_stages: int = 7, # Increased number of stages
-          p_z_given_x_init: Optional[np.ndarray] = None,
-          max_iterations: int = 3000, # Increased maximum iterations 
-          tolerance: float = 1e-12, # Tighter tolerance
-          verbose: bool = False) -> Tuple[np.ndarray, float, float]:
+      num_stages: int = 7, # Adjusted based on criticality
+      p_z_given_x_init: Optional[np.ndarray] = None,
+      max_iterations: int = 3000, # Increased maximum iterations 
+      tolerance: float = 1e-12, # Tighter tolerance
+      verbose: bool = False) -> Tuple[np.ndarray, float, float]:
         """
         Improved staged optimization process with more careful approach to target β
-         
+        
         Args:
-         target_beta: Target β value to optimize for
-         num_stages: Number of intermediate stages
-         p_z_given_x_init: Initial encoder (if None, will be initialized)
-         max_iterations: Maximum iterations per stage
-         tolerance: Convergence tolerance (ultra-high precision)
-         verbose: Whether to print details
-          
+        target_beta: Target β value to optimize for
+        num_stages: Number of intermediate stages
+        p_z_given_x_init: Initial encoder (if None, will be initialized)
+        max_iterations: Maximum iterations per stage
+        tolerance: Convergence tolerance (ultra-high precision)
+        verbose: Whether to print details
+        
         Returns:
-         p_z_given_x: Optimized encoder
-         mi_zx: Mutual information I(Z;X)
-         mi_zy: Mutual information I(Z;Y)
+        p_z_given_x: Optimized encoder
+        mi_zx: Mutual information I(Z;X)
+        mi_zy: Mutual information I(Z;Y)
         """
+        # Check if this is a critical beta value
+        is_critical = abs(target_beta - self.target_beta_star) < 0.15
+        
+        # For critical values, use more stages and different parameters
+        if is_critical:
+            num_stages = max(num_stages, 9)  # More stages for critical region
+            
         if verbose:
-            print(f"Starting staged optimization for β={target_beta:.5f} with {num_stages} stages")
+            if is_critical:
+                print(f"Starting CRITICAL staged optimization for β={target_beta:.5f} with {num_stages} stages")
+            else:
+                print(f"Starting staged optimization for β={target_beta:.5f} with {num_stages} stages")
             
         # Adaptive staging strategy based on proximity to target β*
         proximity = abs(target_beta - self.target_beta_star)
@@ -2272,8 +2318,7 @@ class PerfectedInformationBottleneck:
             # Use non-linear spacing to concentrate points near target
             if in_critical_region:
                 # Very careful approach
-                alpha = 3.0 # More concentration near target
-                num_stages = max(num_stages, 9) # More stages for critical region
+                alpha = 3.0  # More concentration near target 
             else:
                 alpha = 2.0
         else:
@@ -2282,7 +2327,6 @@ class PerfectedInformationBottleneck:
             
             if in_critical_region:
                 alpha = 3.0
-                num_stages = max(num_stages, 9)
             else:
                 alpha = 2.0
             
@@ -2304,7 +2348,7 @@ class PerfectedInformationBottleneck:
         progress_bar_total = len(betas)
         print(f"Optimizing in {progress_bar_total} stages: ", end="", flush=True)
         
-        # Run optimization stages
+        # Run optimization stages with adaptive parameters
         for stage, beta in enumerate(betas):
             # Update progress
             progress_pct = int(100 * (stage+1) / progress_bar_total)
@@ -2318,19 +2362,63 @@ class PerfectedInformationBottleneck:
             
             if stage_proximity < 0.01:
                 # Very close to critical point
-                stage_max_iter = int(max_iterations * 1.2) # More iterations
-                stage_tol = tolerance * 0.1 # Tighter tolerance
+                stage_max_iter = int(max_iterations * 1.2)  # More iterations
+                stage_tol = tolerance * 0.1  # Tighter tolerance
             else:
                 stage_max_iter = max_iterations
                 stage_tol = tolerance
             
-            # Run optimization for this stage
-            p_z_given_x, mi_zx, mi_zy = self._optimize_single_beta(
-                p_z_given_x, beta,
-                max_iterations=stage_max_iter,
-                tolerance=stage_tol,
-                verbose=verbose
-            )
+            # For stages very close to target in critical region, use more careful optimization
+            if stage_proximity < 0.05 and in_critical_region:
+                # Special handling for very critical stages
+                # 1. Multiple random initializations
+                best_objective = float('-inf')
+                best_p_z_given_x = None
+                best_mi_zx = 0.0
+                best_mi_zy = 0.0
+                
+                for init_attempt in range(3):  # Try 3 different initializations
+                    if verbose:
+                        print(f" Critical stage: initialization attempt {init_attempt+1}/3")
+                    
+                    # Different initialization for each attempt
+                    if init_attempt == 0:
+                        init_p_z_given_x = p_z_given_x.copy()  # Continue from previous
+                    elif init_attempt == 1:
+                        init_p_z_given_x = self.enhanced_near_critical_initialization(beta)  # Fresh critical initialization
+                    else:
+                        init_p_z_given_x = self.initialize_multi_modal()  # Try multi-modal
+                    
+                    # Run optimization for this stage with the current initialization
+                    tmp_p_z_given_x, tmp_mi_zx, tmp_mi_zy = self._optimize_single_beta(
+                        init_p_z_given_x, beta,
+                        max_iterations=stage_max_iter,
+                        tolerance=stage_tol,
+                        verbose=verbose
+                    )
+                    
+                    # Calculate objective
+                    tmp_objective = tmp_mi_zy - beta * tmp_mi_zx
+                    
+                    # Keep the best result
+                    if tmp_objective > best_objective:
+                        best_objective = tmp_objective
+                        best_p_z_given_x = tmp_p_z_given_x
+                        best_mi_zx = tmp_mi_zx
+                        best_mi_zy = tmp_mi_zy
+                
+                # Use the best result
+                p_z_given_x = best_p_z_given_x
+                mi_zx = best_mi_zx
+                mi_zy = best_mi_zy
+            else:
+                # Regular optimization for non-critical stages
+                p_z_given_x, mi_zx, mi_zy = self._optimize_single_beta(
+                    p_z_given_x, beta,
+                    max_iterations=stage_max_iter,
+                    tolerance=stage_tol,
+                    verbose=verbose
+                )
             
             if verbose:
                 print(f" Stage {stage+1} complete: I(Z;X)={mi_zx:.6f}, I(Z;Y)={mi_zy:.6f}")
@@ -2349,7 +2437,7 @@ class PerfectedInformationBottleneck:
             print(f"Final values: I(Z;X)={mi_zx:.6f}, I(Z;Y)={mi_zy:.6f}")
             
         return p_z_given_x, mi_zx, mi_zy
-     
+
     ### ENHANCEMENT: Improved encoder optimization
     def optimize_encoder(self, beta: float, 
          use_staged: bool = True, # Default to staged optimization
@@ -4069,6 +4157,7 @@ def run_benchmarks(ib: PerfectedInformationBottleneck, verbose: bool = True) -> 
     return beta_star, results
 
 
+# Final resource cleanup to ensure all threads terminate
 # Final resource cleanup to ensure all threads terminate
 import atexit
 import gc
