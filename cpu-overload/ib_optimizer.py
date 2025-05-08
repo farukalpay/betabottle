@@ -216,12 +216,23 @@ class MinimalIB:
             start_beta = max(0.1, beta * 0.8)
             betas = np.linspace(start_beta, beta, 7)
             
-            for stage_beta in betas:
+            # Add progress reporting
+            num_stages = len(betas)
+            print(f"Optimizing in {num_stages} stages: ", end="", flush=True)
+            
+            for i, stage_beta in enumerate(betas):
+                # Report progress percentage
+                progress = int(100 * (i + 1) / num_stages)
+                print(f"{progress}% ", end="", flush=True)
+                
                 p_z_given_x, _, _ = self._optimize_single_beta(
                     p_z_given_x, stage_beta,
                     max_iterations=max_iterations,
                     tolerance=tolerance
                 )
+            
+            # Print completion message
+            print(" Done!")
         else:
             # Single-stage optimization
             p_z_given_x, _, _ = self._optimize_single_beta(
@@ -236,7 +247,6 @@ class MinimalIB:
         mi_zy = self.calculate_mi_zy(p_z_given_x)
         
         return p_z_given_x, mi_zx, mi_zy
-
 
 def optimize_beta_wrapper(beta_config_tuple):
     """
