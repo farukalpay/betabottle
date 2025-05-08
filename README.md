@@ -59,10 +59,6 @@ After running `ib_beta_star_validation_v5.py`, the following should occur:
 ## 📁 Repository Structure
 
 ```
-Here is the updated Repository Structure section in clean Markdown format:
-
-## 📁 Repository Structure
-
 betabottle/
 ├── betabottle/                          # (Optional) Future modular Python package folder
 │   └── init.py                      # Placeholder for PyPI package setup
