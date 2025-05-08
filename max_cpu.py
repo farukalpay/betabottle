@@ -656,7 +656,7 @@ class PerfectedInformationBottleneck:
             finished_futures = []
 
             # Use ProcessPoolExecutor here for true multiprocessing
-            with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 for beta in batch:
                     futures.append(executor.submit(process_with_semaphore_wrapper, beta, self))
 
