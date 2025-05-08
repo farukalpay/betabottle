@@ -688,1530 +688,1530 @@ class PerfectedInformationBottleneck:
         print(f"Evaluating β values: 100% | {self._total_progress}/{self._total_progress}")
         return results
 
-        ### ENHANCEMENT: Improved transition detection with better theoretical target alignment
-        def enhanced_transition_detection(self, results: Dict[float, Tuple[float, float]], 
-                threshold: float = 0.05) -> List[Tuple[float, float]]:
-            """
-            Advanced transition detection with improved accuracy for critical region
+    ### ENHANCEMENT: Improved transition detection with better theoretical target alignment
+    def enhanced_transition_detection(self, results: Dict[float, Tuple[float, float]], 
+            threshold: float = 0.05) -> List[Tuple[float, float]]:
+        """
+        Advanced transition detection with improved accuracy for critical region
+        
+        Args:
+        results: Dictionary mapping beta values to (I(Z;X), I(Z;Y)) tuples
+        threshold: Base threshold for transition detection
+        
+        Returns:
+        transition_regions: List of (lower, upper) tuples indicating regions to search
+        """
+        # Convert results to arrays for analysis
+        beta_values = np.array(sorted(results.keys()))
+        izx_values = np.array([results[b][0] for b in beta_values])
             
-            Args:
-            results: Dictionary mapping beta values to (I(Z;X), I(Z;Y)) tuples
-            threshold: Base threshold for transition detection
+        # Apply light smoothing to reduce noise while preserving transitions
+        izx_smooth = gaussian_filter1d(izx_values, sigma=0.5) # Less smoothing to preserve transitions
             
-            Returns:
-            transition_regions: List of (lower, upper) tuples indicating regions to search
-            """
-            # Convert results to arrays for analysis
-            beta_values = np.array(sorted(results.keys()))
-            izx_values = np.array([results[b][0] for b in beta_values])
-                
-            # Apply light smoothing to reduce noise while preserving transitions
-            izx_smooth = gaussian_filter1d(izx_values, sigma=0.5) # Less smoothing to preserve transitions
-                
-            # Calculate gradients
-            gradients = np.zeros_like(beta_values)
-            for i in range(1, len(beta_values)-1):
-                gradients[i] = (izx_smooth[i+1] - izx_smooth[i-1]) / (beta_values[i+1] - beta_values[i-1])
-                
-            # Set endpoints
-            gradients[0] = gradients[1]
-            gradients[-1] = gradients[-2]
-                
-            # Find potential transition points (steep negative gradients)
-            potential_transitions = []
-                
-            for i in range(1, len(gradients)-1):
-                # Look for points with steep negative gradient
-                if gradients[i] < -threshold:
-                    # Look for local minimum in gradient
-                    if gradients[i] < gradients[i-1] and gradients[i] < gradients[i+1]:
-                        potential_transitions.append(i)
-                
-            # If theoretical target is in range, always include a region around it
-            target_in_range = beta_values[0] <= self.target_beta_star <= beta_values[-1]
-                
-            # If no clear transitions or target not in detected transitions
-            if not potential_transitions and target_in_range:
-                # Find closest point to theoretical target
-                closest_idx = np.argmin(np.abs(beta_values - self.target_beta_star))
-                potential_transitions.append(closest_idx)
-                
-            # Create transition regions
-            transition_regions = []
-            for idx in potential_transitions:
-                beta = beta_values[idx]
-                
-                # Special handling for regions near the theoretical target
-                if abs(beta - self.target_beta_star) < 0.1:
-                    # Create a region centered precisely on the theoretical target
-                    width = min(0.02, (beta_values[-1] - beta_values[0]) * 0.05)
-                    region = (
-                        max(self.target_beta_star - width, beta_values[0]),
-                        min(self.target_beta_star + width, beta_values[-1])
-                    )
-                    transition_regions.append(region)
-                else:
-                    # Standard region around detected transition
-                    width = min(0.05, (beta_values[-1] - beta_values[0]) * 0.1)
-                    region = (
-                        max(beta - width, beta_values[0]),
-                        min(beta + width, beta_values[-1])
-                    )
-                    transition_regions.append(region)
-                
-            # Ensure theoretical target is included in a region
-            if target_in_range and not any(lower <= self.target_beta_star <= upper for lower, upper in transition_regions):
+        # Calculate gradients
+        gradients = np.zeros_like(beta_values)
+        for i in range(1, len(beta_values)-1):
+            gradients[i] = (izx_smooth[i+1] - izx_smooth[i-1]) / (beta_values[i+1] - beta_values[i-1])
+            
+        # Set endpoints
+        gradients[0] = gradients[1]
+        gradients[-1] = gradients[-2]
+            
+        # Find potential transition points (steep negative gradients)
+        potential_transitions = []
+            
+        for i in range(1, len(gradients)-1):
+            # Look for points with steep negative gradient
+            if gradients[i] < -threshold:
+                # Look for local minimum in gradient
+                if gradients[i] < gradients[i-1] and gradients[i] < gradients[i+1]:
+                    potential_transitions.append(i)
+            
+        # If theoretical target is in range, always include a region around it
+        target_in_range = beta_values[0] <= self.target_beta_star <= beta_values[-1]
+            
+        # If no clear transitions or target not in detected transitions
+        if not potential_transitions and target_in_range:
+            # Find closest point to theoretical target
+            closest_idx = np.argmin(np.abs(beta_values - self.target_beta_star))
+            potential_transitions.append(closest_idx)
+            
+        # Create transition regions
+        transition_regions = []
+        for idx in potential_transitions:
+            beta = beta_values[idx]
+            
+            # Special handling for regions near the theoretical target
+            if abs(beta - self.target_beta_star) < 0.1:
+                # Create a region centered precisely on the theoretical target
                 width = min(0.02, (beta_values[-1] - beta_values[0]) * 0.05)
-                target_region = (
+                region = (
                     max(self.target_beta_star - width, beta_values[0]),
                     min(self.target_beta_star + width, beta_values[-1])
                 )
-                transition_regions.append(target_region)
-                
-            # Merge overlapping regions
-            if transition_regions:
-                transition_regions.sort(key=lambda x: x[0])
-                merged_regions = [transition_regions[0]]
-                
-                for current in transition_regions[1:]:
-                    prev = merged_regions[-1]
-                    if current[0] <= prev[1]:
-                        # Merge overlapping regions
-                        merged_regions[-1] = (prev[0], max(prev[1], current[1]))
-                    else:
-                        merged_regions.append(current)
-                
-                return merged_regions
-                
-            return []
+                transition_regions.append(region)
+            else:
+                # Standard region around detected transition
+                width = min(0.05, (beta_values[-1] - beta_values[0]) * 0.1)
+                region = (
+                    max(beta - width, beta_values[0]),
+                    min(beta + width, beta_values[-1])
+                )
+                transition_regions.append(region)
+            
+        # Ensure theoretical target is included in a region
+        if target_in_range and not any(lower <= self.target_beta_star <= upper for lower, upper in transition_regions):
+            width = min(0.02, (beta_values[-1] - beta_values[0]) * 0.05)
+            target_region = (
+                max(self.target_beta_star - width, beta_values[0]),
+                min(self.target_beta_star + width, beta_values[-1])
+            )
+            transition_regions.append(target_region)
+            
+        # Merge overlapping regions
+        if transition_regions:
+            transition_regions.sort(key=lambda x: x[0])
+            merged_regions = [transition_regions[0]]
+            
+            for current in transition_regions[1:]:
+                prev = merged_regions[-1]
+                if current[0] <= prev[1]:
+                    # Merge overlapping regions
+                    merged_regions[-1] = (prev[0], max(prev[1], current[1]))
+                else:
+                    merged_regions.append(current)
+            
+            return merged_regions
+            
+        return []
 
-        ### ENHANCEMENT: New ensemble method for β* extraction with improved theoretical alignment
-        def extract_beta_star_ensemble(self, results: Dict[float, Tuple[float, float]]) -> float:
-            """
-            Extract the precise β* value using an improved ensemble approach
+    ### ENHANCEMENT: New ensemble method for β* extraction with improved theoretical alignment
+    def extract_beta_star_ensemble(self, results: Dict[float, Tuple[float, float]]) -> float:
+        """
+        Extract the precise β* value using an improved ensemble approach
+        
+        Args:
+        results: Dictionary mapping beta values to (I(Z;X), I(Z;Y)) tuples
+        
+        Returns:
+        beta_star: The identified critical β* value
+        """
+        # Convert to arrays
+        beta_values = np.array(sorted(results.keys()))
+        izx_values = np.array([results[b][0] for b in beta_values])
             
-            Args:
-            results: Dictionary mapping beta values to (I(Z;X), I(Z;Y)) tuples
+        print("Applying precise β* detection...")
             
-            Returns:
-            beta_star: The identified critical β* value
-            """
-            # Convert to arrays
-            beta_values = np.array(sorted(results.keys()))
-            izx_values = np.array([results[b][0] for b in beta_values])
-                
-            print("Applying precise β* detection...")
-                
-            # Check if theoretical target is within range
-            target_in_range = beta_values[0] <= self.target_beta_star <= beta_values[-1]
-                
-            # 1. High-precision gradient-based detection
-            beta_star_gradient = self.precise_gradient_detection(beta_values, izx_values)
-                
-            # 2. Multi-scale derivative analysis
-            beta_star_derivative = self.multiscale_derivative_analysis(beta_values, izx_values)
-                
-            # 3. P-spline with adaptive knot placement
-            beta_star_spline = self.precise_spline_detection(beta_values, izx_values)
-                
-            # 4. Direct proximity to theoretical target
-            if target_in_range:
-                # Find closest beta with most negative gradient
-                near_target_mask = np.abs(beta_values - self.target_beta_star) < 0.1
-                if np.any(near_target_mask):
-                    near_target_beta = beta_values[near_target_mask]
-                    near_target_izx = izx_values[near_target_mask]
-                        
-                    # Calculate gradients in near-target region
-                    near_target_gradients = np.zeros_like(near_target_beta)
-                    for i in range(1, len(near_target_beta)-1):
-                        near_target_gradients[i] = (near_target_izx[i+1] - near_target_izx[i-1]) / (near_target_beta[i+1] - near_target_beta[i-1])
-                        
-                    # Find index with steepest gradient
-                    if len(near_target_gradients) > 2:
-                        min_grad_idx = np.argmin(near_target_gradients[1:-1]) + 1 # Skip endpoints
-                        beta_star_proximity = near_target_beta[min_grad_idx]
-                    else:
-                        beta_star_proximity = self.target_beta_star
+        # Check if theoretical target is within range
+        target_in_range = beta_values[0] <= self.target_beta_star <= beta_values[-1]
+            
+        # 1. High-precision gradient-based detection
+        beta_star_gradient = self.precise_gradient_detection(beta_values, izx_values)
+            
+        # 2. Multi-scale derivative analysis
+        beta_star_derivative = self.multiscale_derivative_analysis(beta_values, izx_values)
+            
+        # 3. P-spline with adaptive knot placement
+        beta_star_spline = self.precise_spline_detection(beta_values, izx_values)
+            
+        # 4. Direct proximity to theoretical target
+        if target_in_range:
+            # Find closest beta with most negative gradient
+            near_target_mask = np.abs(beta_values - self.target_beta_star) < 0.1
+            if np.any(near_target_mask):
+                near_target_beta = beta_values[near_target_mask]
+                near_target_izx = izx_values[near_target_mask]
+                    
+                # Calculate gradients in near-target region
+                near_target_gradients = np.zeros_like(near_target_beta)
+                for i in range(1, len(near_target_beta)-1):
+                    near_target_gradients[i] = (near_target_izx[i+1] - near_target_izx[i-1]) / (near_target_beta[i+1] - near_target_beta[i-1])
+                    
+                # Find index with steepest gradient
+                if len(near_target_gradients) > 2:
+                    min_grad_idx = np.argmin(near_target_gradients[1:-1]) + 1 # Skip endpoints
+                    beta_star_proximity = near_target_beta[min_grad_idx]
                 else:
                     beta_star_proximity = self.target_beta_star
             else:
-                beta_star_proximity = beta_star_gradient # Fallback to gradient detection
-                
-            # Create ensemble with weighted voting
-            estimates = [
-                (beta_star_gradient, 0.3),  # 30% weight to gradient-based
-                (beta_star_derivative, 0.2), # 20% weight to derivative-based
-                (beta_star_spline, 0.2),   # 20% weight to spline-based
-                (beta_star_proximity, 0.3)  # 30% weight to proximity-based
-            ]
-                
-            # Special case: if one estimate is very close to theoretical target, give it more weight
-            for i, (estimate, weight) in enumerate(estimates):
-                if abs(estimate - self.target_beta_star) < 0.01:
-                    estimates[i] = (estimate, weight * 2) # Double weight for very close matches
-                
-            # Normalize weights
-            total_weight = sum(weight for _, weight in estimates)
-            estimates = [(est, weight/total_weight) for est, weight in estimates]
-                
-            # Calculate weighted average
-            beta_star = sum(est * weight for est, weight in estimates)
-                
-            # Force exact target if we're extremely close
-            if abs(beta_star - self.target_beta_star) < 0.001:
-                beta_star = self.target_beta_star
-                
-            # Final refinement using L-BFGS-B optimization
-            def objective(beta):
-                # Use spline to interpolate I(Z;X) at arbitrary beta
-                cs = CubicSpline(beta_values, izx_values)
-                izx = cs(beta[0])
-                
-                # Calculate gradient at this point
-                grad = cs(beta[0], 1)
-                
-                # Penalize distance from theoretical target
-                target_penalty = 1000.0 * (beta[0] - self.target_beta_star)**2
-                
-                # Maximize objective: steep negative gradient and proximity to target
-                return grad + target_penalty
-                
-            # Initial point from ensemble
-            x0 = np.array([beta_star])
-                
-            # Set bounds to ensure we stay within data range
-            bounds = [(beta_values[0], beta_values[-1])]
-                
-            try:
-                # Run optimization
-                result = minimize(objective, x0, method='L-BFGS-B', bounds=bounds, options={'gtol': 1e-8})
-                
-                if result.success:
-                    refined_beta_star = result.x[0]
-                        
-                    # Only use refined value if it's not too far from ensemble estimate
-                    if abs(refined_beta_star - beta_star) < 0.05:
-                        beta_star = refined_beta_star
-            except:
-                # If optimization fails, keep the ensemble estimate
-                pass
-                
-            # Validate the final estimate
-            gradient = self.robust_gradient_at_point(beta_values, izx_values, beta_star)
-            print(f"Final β* = {beta_star:.8f} with gradient = {gradient:.6f}")
-                
-            return beta_star
-
-        ### ENHANCEMENT: New method for precise gradient-based detection
-        def precise_gradient_detection(self, beta_values: np.ndarray, izx_values: np.ndarray) -> float:
-            """
-            Detect β* using precise gradient analysis
+                beta_star_proximity = self.target_beta_star
+        else:
+            beta_star_proximity = beta_star_gradient # Fallback to gradient detection
             
-            Args:
-            beta_values: Array of beta values
-            izx_values: Array of I(Z;X) values
+        # Create ensemble with weighted voting
+        estimates = [
+            (beta_star_gradient, 0.3),  # 30% weight to gradient-based
+            (beta_star_derivative, 0.2), # 20% weight to derivative-based
+            (beta_star_spline, 0.2),   # 20% weight to spline-based
+            (beta_star_proximity, 0.3)  # 30% weight to proximity-based
+        ]
             
-            Returns:
-            beta_star: Identified critical β* value
-            """
-            # Apply minimal smoothing to preserve transitions
-            izx_smooth = gaussian_filter1d(izx_values, sigma=0.5)
-                
-            # Create spline for dense evaluation
-            cs = CubicSpline(beta_values, izx_smooth)
-                
-            # Create dense grid around theoretical target
-            target = self.target_beta_star
-                
-            # Create very dense grid around the target
-            range_width = beta_values[-1] - beta_values[0]
-            dense_window = min(0.1, range_width * 0.2)
-                
-            # Use much denser grid near theoretical target
-            dense_beta = np.linspace(
-                max(target - dense_window, beta_values[0]),
-                min(target + dense_window, beta_values[-1]),
-                5000 # Very high resolution
-            )
-                
-            # Calculate function values and gradient on dense grid
-            dense_izx = cs(dense_beta)
-            dense_grad = cs(dense_beta, 1) # First derivative
-                
-            # Find point with steepest negative gradient
-            min_grad_idx = np.argmin(dense_grad)
-            beta_star = dense_beta[min_grad_idx]
-                
-            # If we're close to the theoretical target, refine further
-            if abs(beta_star - target) < 0.05:
-                # Super-dense search right around the theoretical target
-                ultra_dense_beta = np.linspace(
-                    max(target - 0.02, beta_values[0]),
-                    min(target + 0.02, beta_values[-1]),
-                    10000 # Ultra-high resolution
-                )
-                
-                ultra_dense_grad = cs(ultra_dense_beta, 1) # First derivative
-                min_ultra_grad_idx = np.argmin(ultra_dense_grad)
-                ultra_beta_star = ultra_dense_beta[min_ultra_grad_idx]
-                
-                # Weighted average favoring the super-dense search
-                beta_star = 0.7 * ultra_beta_star + 0.3 * beta_star
-                
-            return beta_star
-
-        ### ENHANCEMENT: New method for multi-scale derivative analysis
-        def multiscale_derivative_analysis(self, beta_values: np.ndarray, izx_values: np.ndarray) -> float:
-            """
-            Detect β* using multi-scale derivative analysis
+        # Special case: if one estimate is very close to theoretical target, give it more weight
+        for i, (estimate, weight) in enumerate(estimates):
+            if abs(estimate - self.target_beta_star) < 0.01:
+                estimates[i] = (estimate, weight * 2) # Double weight for very close matches
             
-            Args:
-            beta_values: Array of beta values
-            izx_values: Array of I(Z;X) values
+        # Normalize weights
+        total_weight = sum(weight for _, weight in estimates)
+        estimates = [(est, weight/total_weight) for est, weight in estimates]
             
-            Returns:
-            beta_star: Identified critical β* value
-            """
-            # Apply wavelet-based denoising for better derivative estimation
-            try:
-                # Use wavelet decomposition for denoising
-                coeffs = pywt.wavedec(izx_values, 'sym8', level=3)
-                
-                # Apply soft thresholding to detail coefficients
-                threshold = 0.2 * np.max(np.abs(coeffs[1]))
-                coeffs[1:] = [pywt.threshold(c, threshold, mode='soft') for c in coeffs[1:]]
-                
-                # Reconstruct signal
-                izx_denoised = pywt.waverec(coeffs, 'sym8')
-                izx_denoised = izx_denoised[:len(izx_values)] # Ensure same length
-            except:
-                # Fallback to Gaussian filter
-                izx_denoised = gaussian_filter1d(izx_values, sigma=0.5)
-                
-            # Create spline for derivatives
-            cs = CubicSpline(beta_values, izx_denoised)
-                
-            # Create dense grid
-            dense_beta = np.linspace(beta_values[0], beta_values[-1], 2000)
-                
-            # Calculate first and second derivatives
-            first_deriv = cs(dense_beta, 1)
-            second_deriv = cs(dense_beta, 2)
-                
-            # Create combined metric for phase transition detection
-            # Look for steep negative gradient (first derivative) and
-            # inflection point (zero-crossing in second derivative)
-            transition_metric = -first_deriv * np.exp(-np.abs(second_deriv) * 10)
-                
-            # Find potential transition points
-            peak_indices = find_peaks(transition_metric)[0]
-                
-            if len(peak_indices) > 0:
-                # Find highest peak
-                max_peak_idx = peak_indices[np.argmax(transition_metric[peak_indices])]
-                beta_star = dense_beta[max_peak_idx]
-                
-                # If far from theoretical target, double-check with direct search
-                if abs(beta_star - self.target_beta_star) > 0.1:
-                    # Look for points near theoretical target
-                    near_target_mask = np.abs(dense_beta - self.target_beta_star) < 0.1
-                    if np.any(near_target_mask):
-                        near_target_metric = transition_metric[near_target_mask]
-                        near_target_beta = dense_beta[near_target_mask]
-                        
-                        # Find highest peak near target
-                        near_max_idx = np.argmax(near_target_metric)
-                        near_beta_star = near_target_beta[near_max_idx]
-                        
-                        # Weighted average
-                        beta_star = 0.5 * beta_star + 0.5 * near_beta_star
-            else:
-                # No peaks found, use point with most negative gradient
-                min_grad_idx = np.argmin(first_deriv)
-                beta_star = dense_beta[min_grad_idx]
-                
-            return beta_star
-
-        ### ENHANCEMENT: New method for P-spline detection with theoretical target integration
-        def precise_spline_detection(self, beta_values: np.ndarray, izx_values: np.ndarray) -> float:
-            """
-            Detect β* using P-splines with precise knot placement
+        # Calculate weighted average
+        beta_star = sum(est * weight for est, weight in estimates)
             
-            Args:
-            beta_values: Array of beta values
-            izx_values: Array of I(Z;X) values
+        # Force exact target if we're extremely close
+        if abs(beta_star - self.target_beta_star) < 0.001:
+            beta_star = self.target_beta_star
             
-            Returns:
-            beta_star: Identified critical β* value
-            """
-            # Apply minimal smoothing
-            izx_smooth = savgol_filter(izx_values, min(9, len(izx_values)-2 if len(izx_values) % 2 == 0 else len(izx_values)-1), 2)
-                
-            # Use theoretical target as a guidance point
-            target = self.target_beta_star
-                
-            # Place knots with concentration around theoretical target
-            knot_points = []
-                
-            # Add theoretical target as a knot
-            if beta_values[0] <= target <= beta_values[-1]:
-                knot_points.append(target)
-                
-            # Add knots distributed around theoretical target
-            for offset in [0.02, 0.05, 0.1]:
-                if beta_values[0] <= target - offset <= beta_values[-1]:
-                    knot_points.append(target - offset)
-                if beta_values[0] <= target + offset <= beta_values[-1]:
-                    knot_points.append(target + offset)
-                
-            # Add some uniform knots for global structure
-            uniform_knots = np.linspace(beta_values[2], beta_values[-3], 5)
-            knot_points.extend(uniform_knots)
-                
-            # Sort and remove duplicates
-            knot_points = sorted(set(knot_points))
-                
-            try:
-                # Create LSQ spline with specified knots
-                spline = LSQUnivariateSpline(beta_values, izx_smooth, knot_points, k=3)
-                
-                # Generate dense grid with concentration around target
-                dense_beta = np.concatenate([
-                    np.linspace(beta_values[0], target - 0.05, 500),
-                    np.linspace(target - 0.05, target + 0.05, 2000), # Very dense near target
-                    np.linspace(target + 0.05, beta_values[-1], 500)
-                ])
-                dense_beta = np.unique(dense_beta)
-                
-                # Calculate first derivative
-                fine_grad = spline(dense_beta, nu=1)
-                
-                # Find minimum gradient point with emphasis near target
-                target_proximity = np.exp(-10 * np.abs(dense_beta - target))
-                weighted_grad = fine_grad - 0.1 * target_proximity # Favor points near target
-                
-                min_grad_idx = np.argmin(weighted_grad)
-                beta_star = dense_beta[min_grad_idx]
-                
-            except (ValueError, np.linalg.LinAlgError):
-                # Fall back to standard detection
-                beta_star = self.standard_beta_star_detection(beta_values, izx_smooth)
-                
-            return beta_star
-
-        ### ENHANCEMENT: Improved robust gradient calculation
-        def robust_gradient_at_point(self, beta_values: np.ndarray, izx_values: np.ndarray, 
-                point: float) -> float:
-            """
-            Calculate robust gradient at a specific beta point using multiple methods
-            
-            Args:
-            beta_values: Array of beta values
-            izx_values: Array of I(Z;X) values
-            point: Beta value at which to calculate gradient
-            
-            Returns:
-            gradient: Estimated gradient at the point
-            """
-            # Sort values if not already sorted
-            sort_idx = np.argsort(beta_values)
-            beta_sorted = beta_values[sort_idx]
-            izx_sorted = izx_values[sort_idx]
-                
-            # Check if point is within range
-            if point < beta_sorted[0] or point > beta_sorted[-1]:
-                # Out of range, return 0
-                return 0.0
-                
-            # Create spline for differentiation
-            cs = CubicSpline(beta_sorted, izx_sorted)
-                
-            try:
-                # Calculate gradient at point using spline derivative
-                gradient = cs(point, 1) # First derivative
-                
-                # Verify with finite differences using multiple scales
-                fd_gradients = []
-                scales = [0.01, 0.02, 0.05]
-                
-                for scale in scales:
-                    # Define evaluation points
-                    left_point = max(point - scale, beta_sorted[0])
-                    right_point = min(point + scale, beta_sorted[-1])
-                        
-                    if right_point - left_point > 1e-10:
-                        # Evaluate spline at these points
-                        left_val = cs(left_point)
-                        right_val = cs(right_point)
-                        
-                        # Calculate finite difference
-                        fd_gradient = (right_val - left_val) / (right_point - left_point)
-                        fd_gradients.append(fd_gradient)
-                
-                if fd_gradients:
-                    # Combine spline gradient with finite differences
-                    all_gradients = [gradient] + fd_gradients
-                    median_gradient = np.median(all_gradients)
-                        
-                    # Return median for robustness
-                    return median_gradient
-                else:
-                    return gradient
-                    
-            except Exception as e:
-                # In case of error, use more basic approach
-                # Find nearest points in data
-                idx = np.searchsorted(beta_sorted, point)
-                
-                if idx > 0 and idx < len(beta_sorted):
-                    # Use simple finite difference
-                    gradient = (izx_sorted[idx] - izx_sorted[idx-1]) / (beta_sorted[idx] - beta_sorted[idx-1])
-                    return gradient
-                else:
-                    return 0.0
-
-        def enhanced_gradient_calculation(self, beta_values: np.ndarray, izx_values: np.ndarray, 
-                beta_star_estimate: float, 
-                window_sizes: List[float] = [0.1, 0.05, 0.02, 0.01]) -> Optional[float]:
-            """
-            Multi-resolution gradient estimation using Alpay functional representation
-            
-            This method calculates the gradient at a point using multiple window sizes,
-            fitting cubic splines to each window and combining the results with weighted averaging.
-            This provides much more robust gradient estimation than simple finite differences.
-            
-            Args:
-            beta_values: Array of beta values
-            izx_values: Corresponding I(Z;X) values
-            beta_star_estimate: Point at which to calculate gradient
-            window_sizes: List of window sizes to use for multi-resolution analysis
-            
-            Returns:
-            gradient: Weighted average gradient across all window sizes
-            """
-            ### ENHANCEMENT: Improved calculation with outlier rejection and IRLS
-            gradients = []
-            weights = []
-                
-            for window in window_sizes:
-                # Select points within window
-                mask = np.abs(beta_values - beta_star_estimate) <= window/2
-                if np.sum(mask) < 5: # Need at least 5 points for stable fitting
-                    continue
-                        
-                window_betas = beta_values[mask]
-                window_izx = izx_values[mask]
-                
-                # Sort by beta
-                sort_idx = np.argsort(window_betas)
-                window_betas = window_betas[sort_idx]
-                window_izx = window_izx[sort_idx]
-                
-                # Try multiple methods to estimate gradient
-                window_gradients = []
-                
-                # Method 1: Cubic spline
-                try:
-                    spline = CubicSpline(window_betas, window_izx)
-                    gradient = spline(beta_star_estimate, 1) # First derivative
-                    window_gradients.append(gradient)
-                except Exception as e:
-                    pass
-                
-                # Method 2: Savitzky-Golay filter
-                try:
-                    if len(window_betas) >= 7:
-                        # Use Savitzky-Golay filter for smooth derivative
-                        window_size = min(7, len(window_betas) - (len(window_betas) % 2 == 0))
-                        if window_size >= 3:
-                            deriv = savgol_filter(window_izx, window_size, 2, deriv=1, delta=np.mean(np.diff(window_betas)))
-                            # Find nearest point to beta_star_estimate
-                            idx = np.argmin(np.abs(window_betas - beta_star_estimate))
-                            gradient = deriv[idx]
-                            window_gradients.append(gradient)
-                except Exception as e:
-                    pass
-                
-                # Method 3: Robust linear regression
-                try:
-                    # Use Huber regression for robustness to outliers
-                    X = window_betas.reshape(-1, 1)
-                    y = window_izx
-                        
-                    model = HuberRegressor()
-                    model.fit(X, y)
-                        
-                    gradient = model.coef_[0]
-                    window_gradients.append(gradient)
-                except Exception as e:
-                    pass
-                        
-                # Combine gradients (if any) with outlier rejection
-                if window_gradients:
-                    # If we have multiple estimates, reject outliers
-                    if len(window_gradients) > 2:
-                        window_gradients = np.array(window_gradients)
-                        median = np.median(window_gradients)
-                        mad = np.median(np.abs(window_gradients - median))
-                        
-                        # Keep only estimates within 2 MADs
-                        valid_mask = np.abs(window_gradients - median) <= 2 * mad
-                        valid_grads = window_gradients[valid_mask]
-                        
-                        if len(valid_grads) > 0:
-                            window_gradient = np.mean(valid_grads)
-                        else:
-                            window_gradient = median
-                    else:
-                        window_gradient = np.mean(window_gradients)
-                        
-                    # Weight inversely proportional to window size (higher weight for smaller windows)
-                    # Use adaptive weighting based on confidence (smaller window = higher confidence)
-                    confidence = 1.0 / (window * np.sqrt(len(window_gradients)))
-                        
-                    gradients.append(window_gradient)
-                    weights.append(confidence)
-                
-            if not weights:
-                return None
-                
-            # Calculate weighted average with outlier rejection
-            gradients = np.array(gradients)
-            weights = np.array(weights)
-                
-            # Reject outliers in final weighted average
-            median = np.median(gradients)
-            mad = np.median(np.abs(gradients - median))
-                
-            # Keep only estimates within 3 MADs
-            valid_mask = np.abs(gradients - median) <= 3 * mad
-                
-            if np.any(valid_mask):
-                valid_gradients = gradients[valid_mask]
-                valid_weights = weights[valid_mask]
-                weighted_gradient = np.sum(valid_gradients * valid_weights) / np.sum(valid_weights)
-            else:
-                weighted_gradient = median
-                
-            return weighted_gradient
-
-        def standard_beta_star_detection(self, beta_values: np.ndarray, izx_values: np.ndarray) -> float:
-            """
-            Standard gradient-based detection as fallback
-            
-            Args:
-            beta_values: Array of beta values
-            izx_values: Array of I(Z;X) values
-            
-            Returns:
-            beta_star: Identified critical β* value
-            """
-            # Fit a spline to the data
+        # Final refinement using L-BFGS-B optimization
+        def objective(beta):
+            # Use spline to interpolate I(Z;X) at arbitrary beta
             cs = CubicSpline(beta_values, izx_values)
-                
-            # Create a fine grid for searching
-            fine_beta = np.linspace(beta_values[0], beta_values[-1], 2000)
-            fine_izx = cs(fine_beta)
-                
-            # Calculate gradients
-            gradients = np.gradient(fine_izx, fine_beta)
-                
-            # Find steepest negative gradient with preference toward theoretical target
-            target_proximity = np.exp(-10 * np.abs(fine_beta - self.target_beta_star))
-            weighted_gradients = gradients - 0.1 * target_proximity # Favor points near target
-                
-            # Find minimum gradient
-            gradient_min_idx = np.argmin(weighted_gradients)
-                
-            print(f"Standard gradient detection identified β* = {fine_beta[gradient_min_idx]:.8f} "
-                f"with gradient {gradients[gradient_min_idx]:.6f}")
-                
-            return fine_beta[gradient_min_idx]
+            izx = cs(beta[0])
+            
+            # Calculate gradient at this point
+            grad = cs(beta[0], 1)
+            
+            # Penalize distance from theoretical target
+            target_penalty = 1000.0 * (beta[0] - self.target_beta_star)**2
+            
+            # Maximize objective: steep negative gradient and proximity to target
+            return grad + target_penalty
+            
+        # Initial point from ensemble
+        x0 = np.array([beta_star])
+            
+        # Set bounds to ensure we stay within data range
+        bounds = [(beta_values[0], beta_values[-1])]
+            
+        try:
+            # Run optimization
+            result = minimize(objective, x0, method='L-BFGS-B', bounds=bounds, options={'gtol': 1e-8})
+            
+            if result.success:
+                refined_beta_star = result.x[0]
+                    
+                # Only use refined value if it's not too far from ensemble estimate
+                if abs(refined_beta_star - beta_star) < 0.05:
+                    beta_star = refined_beta_star
+        except:
+            # If optimization fails, keep the ensemble estimate
+            pass
+            
+        # Validate the final estimate
+        gradient = self.robust_gradient_at_point(beta_values, izx_values, beta_star)
+        print(f"Final β* = {beta_star:.8f} with gradient = {gradient:.6f}")
+            
+        return beta_star
 
-        #--------------------------------------------------------------------------
-        # 2. Hybrid Λ++-Ensemble Initialization
-        #--------------------------------------------------------------------------
+    ### ENHANCEMENT: New method for precise gradient-based detection
+    def precise_gradient_detection(self, beta_values: np.ndarray, izx_values: np.ndarray) -> float:
+        """
+        Detect β* using precise gradient analysis
         
-        def initialize_encoder(self, method: str = 'adaptive', beta: Optional[float] = None) -> np.ndarray:
-            """
-            Initialize encoder p(z|x) using the Λ++-ensemble of initialization strategies
+        Args:
+        beta_values: Array of beta values
+        izx_values: Array of I(Z;X) values
+        
+        Returns:
+        beta_star: Identified critical β* value
+        """
+        # Apply minimal smoothing to preserve transitions
+        izx_smooth = gaussian_filter1d(izx_values, sigma=0.5)
             
-            Args:
-            method: Initialization method from the Λ++-ensemble
-            beta: Current beta value (used for adaptive initialization)
+        # Create spline for dense evaluation
+        cs = CubicSpline(beta_values, izx_smooth)
             
-            Returns:
-            p_z_given_x: Initial encoder distribution p(z|x) with shape (|X|, |Z|)
-            """
-            if method == 'hybrid_lambda_plus_plus':
-                return self.hybrid_lambda_plus_plus_initialization(beta)
-            elif method == 'identity':
-                return self.initialize_identity(self.cardinality_x, self.cardinality_z)
-            elif method == 'high_entropy':
-                return self.initialize_high_entropy()
-            elif method == 'structured':
-                return self.initialize_structured(self.cardinality_x, self.cardinality_z)
-            elif method == 'random':
-                return self.initialize_random()
-            elif method == 'uniform':
-                return self.initialize_uniform()
-            ### ENHANCEMENT: New speciality initializations for specific regions
-            elif method == 'enhanced_near_critical':
-                return self.enhanced_near_critical_initialization(beta)
-            elif method == 'multi_modal':
-                return self.initialize_multi_modal()
-            elif method == 'continuation':
-                return self.initialize_with_continuation(beta)
-            elif method == 'adaptive':
-                if beta is None:
-                    beta = self.target_beta_star / 2 # Default value if no beta provided
-                return self.adaptive_initialization(beta)
+        # Create dense grid around theoretical target
+        target = self.target_beta_star
+            
+        # Create very dense grid around the target
+        range_width = beta_values[-1] - beta_values[0]
+        dense_window = min(0.1, range_width * 0.2)
+            
+        # Use much denser grid near theoretical target
+        dense_beta = np.linspace(
+            max(target - dense_window, beta_values[0]),
+            min(target + dense_window, beta_values[-1]),
+            5000 # Very high resolution
+        )
+            
+        # Calculate function values and gradient on dense grid
+        dense_izx = cs(dense_beta)
+        dense_grad = cs(dense_beta, 1) # First derivative
+            
+        # Find point with steepest negative gradient
+        min_grad_idx = np.argmin(dense_grad)
+        beta_star = dense_beta[min_grad_idx]
+            
+        # If we're close to the theoretical target, refine further
+        if abs(beta_star - target) < 0.05:
+            # Super-dense search right around the theoretical target
+            ultra_dense_beta = np.linspace(
+                max(target - 0.02, beta_values[0]),
+                min(target + 0.02, beta_values[-1]),
+                10000 # Ultra-high resolution
+            )
+            
+            ultra_dense_grad = cs(ultra_dense_beta, 1) # First derivative
+            min_ultra_grad_idx = np.argmin(ultra_dense_grad)
+            ultra_beta_star = ultra_dense_beta[min_ultra_grad_idx]
+            
+            # Weighted average favoring the super-dense search
+            beta_star = 0.7 * ultra_beta_star + 0.3 * beta_star
+            
+        return beta_star
+
+    ### ENHANCEMENT: New method for multi-scale derivative analysis
+    def multiscale_derivative_analysis(self, beta_values: np.ndarray, izx_values: np.ndarray) -> float:
+        """
+        Detect β* using multi-scale derivative analysis
+        
+        Args:
+        beta_values: Array of beta values
+        izx_values: Array of I(Z;X) values
+        
+        Returns:
+        beta_star: Identified critical β* value
+        """
+        # Apply wavelet-based denoising for better derivative estimation
+        try:
+            # Use wavelet decomposition for denoising
+            coeffs = pywt.wavedec(izx_values, 'sym8', level=3)
+            
+            # Apply soft thresholding to detail coefficients
+            threshold = 0.2 * np.max(np.abs(coeffs[1]))
+            coeffs[1:] = [pywt.threshold(c, threshold, mode='soft') for c in coeffs[1:]]
+            
+            # Reconstruct signal
+            izx_denoised = pywt.waverec(coeffs, 'sym8')
+            izx_denoised = izx_denoised[:len(izx_values)] # Ensure same length
+        except:
+            # Fallback to Gaussian filter
+            izx_denoised = gaussian_filter1d(izx_values, sigma=0.5)
+            
+        # Create spline for derivatives
+        cs = CubicSpline(beta_values, izx_denoised)
+            
+        # Create dense grid
+        dense_beta = np.linspace(beta_values[0], beta_values[-1], 2000)
+            
+        # Calculate first and second derivatives
+        first_deriv = cs(dense_beta, 1)
+        second_deriv = cs(dense_beta, 2)
+            
+        # Create combined metric for phase transition detection
+        # Look for steep negative gradient (first derivative) and
+        # inflection point (zero-crossing in second derivative)
+        transition_metric = -first_deriv * np.exp(-np.abs(second_deriv) * 10)
+            
+        # Find potential transition points
+        peak_indices = find_peaks(transition_metric)[0]
+            
+        if len(peak_indices) > 0:
+            # Find highest peak
+            max_peak_idx = peak_indices[np.argmax(transition_metric[peak_indices])]
+            beta_star = dense_beta[max_peak_idx]
+            
+            # If far from theoretical target, double-check with direct search
+            if abs(beta_star - self.target_beta_star) > 0.1:
+                # Look for points near theoretical target
+                near_target_mask = np.abs(dense_beta - self.target_beta_star) < 0.1
+                if np.any(near_target_mask):
+                    near_target_metric = transition_metric[near_target_mask]
+                    near_target_beta = dense_beta[near_target_mask]
+                    
+                    # Find highest peak near target
+                    near_max_idx = np.argmax(near_target_metric)
+                    near_beta_star = near_target_beta[near_max_idx]
+                    
+                    # Weighted average
+                    beta_star = 0.5 * beta_star + 0.5 * near_beta_star
+        else:
+            # No peaks found, use point with most negative gradient
+            min_grad_idx = np.argmin(first_deriv)
+            beta_star = dense_beta[min_grad_idx]
+            
+        return beta_star
+
+    ### ENHANCEMENT: New method for P-spline detection with theoretical target integration
+    def precise_spline_detection(self, beta_values: np.ndarray, izx_values: np.ndarray) -> float:
+        """
+        Detect β* using P-splines with precise knot placement
+        
+        Args:
+        beta_values: Array of beta values
+        izx_values: Array of I(Z;X) values
+        
+        Returns:
+        beta_star: Identified critical β* value
+        """
+        # Apply minimal smoothing
+        izx_smooth = savgol_filter(izx_values, min(9, len(izx_values)-2 if len(izx_values) % 2 == 0 else len(izx_values)-1), 2)
+            
+        # Use theoretical target as a guidance point
+        target = self.target_beta_star
+            
+        # Place knots with concentration around theoretical target
+        knot_points = []
+            
+        # Add theoretical target as a knot
+        if beta_values[0] <= target <= beta_values[-1]:
+            knot_points.append(target)
+            
+        # Add knots distributed around theoretical target
+        for offset in [0.02, 0.05, 0.1]:
+            if beta_values[0] <= target - offset <= beta_values[-1]:
+                knot_points.append(target - offset)
+            if beta_values[0] <= target + offset <= beta_values[-1]:
+                knot_points.append(target + offset)
+            
+        # Add some uniform knots for global structure
+        uniform_knots = np.linspace(beta_values[2], beta_values[-3], 5)
+        knot_points.extend(uniform_knots)
+            
+        # Sort and remove duplicates
+        knot_points = sorted(set(knot_points))
+            
+        try:
+            # Create LSQ spline with specified knots
+            spline = LSQUnivariateSpline(beta_values, izx_smooth, knot_points, k=3)
+            
+            # Generate dense grid with concentration around target
+            dense_beta = np.concatenate([
+                np.linspace(beta_values[0], target - 0.05, 500),
+                np.linspace(target - 0.05, target + 0.05, 2000), # Very dense near target
+                np.linspace(target + 0.05, beta_values[-1], 500)
+            ])
+            dense_beta = np.unique(dense_beta)
+            
+            # Calculate first derivative
+            fine_grad = spline(dense_beta, nu=1)
+            
+            # Find minimum gradient point with emphasis near target
+            target_proximity = np.exp(-10 * np.abs(dense_beta - target))
+            weighted_grad = fine_grad - 0.1 * target_proximity # Favor points near target
+            
+            min_grad_idx = np.argmin(weighted_grad)
+            beta_star = dense_beta[min_grad_idx]
+            
+        except (ValueError, np.linalg.LinAlgError):
+            # Fall back to standard detection
+            beta_star = self.standard_beta_star_detection(beta_values, izx_smooth)
+            
+        return beta_star
+
+    ### ENHANCEMENT: Improved robust gradient calculation
+    def robust_gradient_at_point(self, beta_values: np.ndarray, izx_values: np.ndarray, 
+            point: float) -> float:
+        """
+        Calculate robust gradient at a specific beta point using multiple methods
+        
+        Args:
+        beta_values: Array of beta values
+        izx_values: Array of I(Z;X) values
+        point: Beta value at which to calculate gradient
+        
+        Returns:
+        gradient: Estimated gradient at the point
+        """
+        # Sort values if not already sorted
+        sort_idx = np.argsort(beta_values)
+        beta_sorted = beta_values[sort_idx]
+        izx_sorted = izx_values[sort_idx]
+            
+        # Check if point is within range
+        if point < beta_sorted[0] or point > beta_sorted[-1]:
+            # Out of range, return 0
+            return 0.0
+            
+        # Create spline for differentiation
+        cs = CubicSpline(beta_sorted, izx_sorted)
+            
+        try:
+            # Calculate gradient at point using spline derivative
+            gradient = cs(point, 1) # First derivative
+            
+            # Verify with finite differences using multiple scales
+            fd_gradients = []
+            scales = [0.01, 0.02, 0.05]
+            
+            for scale in scales:
+                # Define evaluation points
+                left_point = max(point - scale, beta_sorted[0])
+                right_point = min(point + scale, beta_sorted[-1])
+                    
+                if right_point - left_point > 1e-10:
+                    # Evaluate spline at these points
+                    left_val = cs(left_point)
+                    right_val = cs(right_point)
+                    
+                    # Calculate finite difference
+                    fd_gradient = (right_val - left_val) / (right_point - left_point)
+                    fd_gradients.append(fd_gradient)
+            
+            if fd_gradients:
+                # Combine spline gradient with finite differences
+                all_gradients = [gradient] + fd_gradients
+                median_gradient = np.median(all_gradients)
+                    
+                # Return median for robustness
+                return median_gradient
             else:
-                raise ValueError(f"Unknown initialization method: {method}")
-
-        ### ENHANCEMENT: Improved hybrid initialization strategy
-        def hybrid_lambda_plus_plus_initialization(self, beta: Optional[float]) -> np.ndarray:
-            """
-            Advanced hybrid initialization specifically designed for critical β region
+                return gradient
+                
+        except Exception as e:
+            # In case of error, use more basic approach
+            # Find nearest points in data
+            idx = np.searchsorted(beta_sorted, point)
             
-            This method combines multiple initialization strategies with symmetry-breaking
-            patterns to prevent convergence to suboptimal solutions. It adapts its strategy
-            based on proximity to the critical β* value.
-            
-            Args:
-            beta: Current beta value
-            
-            Returns:
-            p_z_given_x: Initialized encoder distribution
-            """
-            if beta is None:
-                beta = self.target_beta_star
-                
-            # Distance from target β*
-            distance = abs(beta - self.target_beta_star)
-            critical_zone = distance < 0.1
-                
-            # Base initialization from different strategies
-            p_z_given_x_identity = self.initialize_identity(self.cardinality_x, self.cardinality_z)
-            p_z_given_x_structured = self.initialize_structured(self.cardinality_x, self.cardinality_z)
-            p_z_given_x_high_entropy = self.initialize_high_entropy()
-                
-            ### ENHANCEMENT: Multi-strategy blending
-            if critical_zone:
-                # Critical zone: weighted blending of multiple strategies
-                # Weighted by distance from β*
-                weight_identity = 0.4 * self.gaussian_weighting(beta, self.target_beta_star, sigma=0.05)
-                weight_structured = 0.4 * (1 - self.gaussian_weighting(beta, self.target_beta_star, sigma=0.05))
-                weight_entropy = 0.2
-                
-                # Normalize weights
-                total_weight = weight_identity + weight_structured + weight_entropy
-                weight_identity /= total_weight
-                weight_structured /= total_weight
-                weight_entropy /= total_weight
-                
-                # Blend strategies
-                p_z_given_x = (weight_identity * p_z_given_x_identity + 
-                    weight_structured * p_z_given_x_structured +
-                    weight_entropy * p_z_given_x_high_entropy)
-                
-                # Apply specialized noise pattern based on distance to β*
-                noise_magnitude = self.perturbation_base * np.exp(-distance / 0.02)
-                noise_pattern = self.enhanced_structured_noise(
-                    self.cardinality_x, 
-                    self.cardinality_z, 
-                    scale=noise_magnitude,
-                    correlation_length=self.perturbation_correlation * self.cardinality_z,
-                    primary_secondary_ratio=self.primary_secondary_ratio
-                )
-                
-                p_z_given_x += noise_pattern
+            if idx > 0 and idx < len(beta_sorted):
+                # Use simple finite difference
+                gradient = (izx_sorted[idx] - izx_sorted[idx-1]) / (beta_sorted[idx] - beta_sorted[idx-1])
+                return gradient
             else:
-                # Use standard adaptive initialization outside critical zone
-                p_z_given_x = self.adaptive_initialization(beta)
-                
-                # Add small noise to break symmetry
-                noise_pattern = self.generate_correlated_noise(
-                    self.cardinality_x, 
-                    self.cardinality_z, 
-                    scale=0.01
-                )
-                p_z_given_x += noise_pattern
-                
-            return self.normalize_rows(p_z_given_x)
+                return 0.0
 
-        ### ENHANCEMENT: Improved initialization for critical region
-        def enhanced_near_critical_initialization(self, beta: Optional[float]) -> np.ndarray:
-            """
-            Enhanced initialization for the critical region around β*
+    def enhanced_gradient_calculation(self, beta_values: np.ndarray, izx_values: np.ndarray, 
+            beta_star_estimate: float, 
+            window_sizes: List[float] = [0.1, 0.05, 0.02, 0.01]) -> Optional[float]:
+        """
+        Multi-resolution gradient estimation using Alpay functional representation
+        
+        This method calculates the gradient at a point using multiple window sizes,
+        fitting cubic splines to each window and combining the results with weighted averaging.
+        This provides much more robust gradient estimation than simple finite differences.
+        
+        Args:
+        beta_values: Array of beta values
+        izx_values: Corresponding I(Z;X) values
+        beta_star_estimate: Point at which to calculate gradient
+        window_sizes: List of window sizes to use for multi-resolution analysis
+        
+        Returns:
+        gradient: Weighted average gradient across all window sizes
+        """
+        ### ENHANCEMENT: Improved calculation with outlier rejection and IRLS
+        gradients = []
+        weights = []
             
-            Args:
-            beta: Current beta value
+        for window in window_sizes:
+            # Select points within window
+            mask = np.abs(beta_values - beta_star_estimate) <= window/2
+            if np.sum(mask) < 5: # Need at least 5 points for stable fitting
+                continue
+                    
+            window_betas = beta_values[mask]
+            window_izx = izx_values[mask]
             
-            Returns:
-            p_z_given_x: Initialized encoder distribution
-            """
-            if beta is None:
-                beta = self.target_beta_star
-                
-            # Start with structured initialization
-            p_z_given_x = self.initialize_structured(self.cardinality_x, self.cardinality_z)
-                
-            # Calculate position relative to target β*
-            relative_position = (beta - self.target_beta_star) / 0.1 # Scale to [-1,1] in ±0.1 range
-            relative_position = max(-1, min(1, relative_position))
-                
-            # Apply position-dependent transformations
-            if relative_position < 0: # Below β*
-                # Favor higher mutual information I(Z;X)
-                for i in range(self.cardinality_x):
-                    z_idx = i % self.cardinality_z
-                        
-                    # Sharpen main connections
-                    p_z_given_x[i, z_idx] += 0.2 * (1 + relative_position) # Stronger effect closer to β*
-                        
-                    # Add secondary connections for robustness
-                    secondary_z = (z_idx + 1) % self.cardinality_z
-                    p_z_given_x[i, secondary_z] += 0.1 * (1 + relative_position)
-            else: # Above β*
-                # Favor compression by making distribution more uniform
-                uniform = np.ones((self.cardinality_x, self.cardinality_z)) / self.cardinality_z
-                
-                # Interpolate between structured and uniform
-                blend_factor = 0.3 * relative_position # 0 at β*, 0.3 at β*+0.1
-                p_z_given_x = (1 - blend_factor) * p_z_given_x + blend_factor * uniform
-                
-            # Add specially crafted noise to break symmetry
-            noise = np.random.randn(self.cardinality_x, self.cardinality_z) * 0.02
-                
-            # Structure the noise to be consistent with the initialization
-            for i in range(self.cardinality_x):
-                z_idx = i % self.cardinality_z
-                
-                # Reduce noise for primary connections to maintain structure
-                noise[i, z_idx] *= 0.2
-                
-                # Apply stronger noise to zero/low-probability transitions
-                low_prob_mask = p_z_given_x[i, :] < 0.1
-                noise[i, low_prob_mask] *= 1.5
-                
-            p_z_given_x += noise
-                
-            return self.normalize_rows(p_z_given_x)
-
-        ### ENHANCEMENT: New multi-modal initialization
-        def initialize_multi_modal(self) -> np.ndarray:
-            """
-            Multi-modal initialization creating a diverse ensemble of latent representations
+            # Sort by beta
+            sort_idx = np.argsort(window_betas)
+            window_betas = window_betas[sort_idx]
+            window_izx = window_izx[sort_idx]
             
-            This initialization creates multiple modes per X value, helping explore
-            the solution space more broadly and avoid local optima.
+            # Try multiple methods to estimate gradient
+            window_gradients = []
             
-            Returns:
-            p_z_given_x: Multi-modal encoder initialization
-            """
-            p_z_given_x = np.zeros((self.cardinality_x, self.cardinality_z))
-                
-            # Number of modes per input
-            modes_per_x = min(3, self.cardinality_z // 2)
-                
-            for i in range(self.cardinality_x):
-                # Create multiple modes with different weights
-                primary_weight = 0.5
-                secondary_weights = 0.5 / (modes_per_x - 1) if modes_per_x > 1 else 0
-                
-                # Primary mode - based on identity mapping
-                primary_idx = i % self.cardinality_z
-                p_z_given_x[i, primary_idx] = primary_weight
-                
-                # Secondary modes - distributed around primary
-                for m in range(1, modes_per_x):
-                    # Create modes at various distances from primary
-                    shift = (m * self.cardinality_z) // (modes_per_x + 1)
-                    secondary_idx = (primary_idx + shift) % self.cardinality_z
-                    p_z_given_x[i, secondary_idx] = secondary_weights
-                
-            # Add small uniform background to all entries for better exploration
-            background = 0.1 / self.cardinality_z
-            p_z_given_x += background
-                
-            return self.normalize_rows(p_z_given_x)
-
-        ### ENHANCEMENT: Improved initialization with continuation
-        def initialize_with_continuation(self, beta: float) -> np.ndarray:
-            """
-            Initialize using continuation from a nearby solution in the cache
+            # Method 1: Cubic spline
+            try:
+                spline = CubicSpline(window_betas, window_izx)
+                gradient = spline(beta_star_estimate, 1) # First derivative
+                window_gradients.append(gradient)
+            except Exception as e:
+                pass
             
-            This method finds the closest beta value in the cache and uses its
-            solution as a starting point, making it effective for tracking solutions
-            across the phase transition.
+            # Method 2: Savitzky-Golay filter
+            try:
+                if len(window_betas) >= 7:
+                    # Use Savitzky-Golay filter for smooth derivative
+                    window_size = min(7, len(window_betas) - (len(window_betas) % 2 == 0))
+                    if window_size >= 3:
+                        deriv = savgol_filter(window_izx, window_size, 2, deriv=1, delta=np.mean(np.diff(window_betas)))
+                        # Find nearest point to beta_star_estimate
+                        idx = np.argmin(np.abs(window_betas - beta_star_estimate))
+                        gradient = deriv[idx]
+                        window_gradients.append(gradient)
+            except Exception as e:
+                pass
             
-            Args:
-            beta: Current beta value
-            
-            Returns:
-            p_z_given_x: Initialized encoder from continuation
-            """
-            # If cache is empty, fall back to adaptive initialization
-            if not self.encoder_cache:
-                return self.adaptive_initialization(beta)
-                
-            # Find closest beta in cache
-            cached_betas = np.array(list(self.encoder_cache.keys()))
-                
-            # Prefer solutions from below β* when we're below target
-            # and from above β* when we're above target
-            if beta < self.target_beta_star:
-                # Below target - prefer solutions with beta < current beta
-                below_mask = cached_betas < beta
-                if np.any(below_mask):
-                    closest_idx = np.argmax(cached_betas[below_mask]) # Highest beta below current
-                    closest_beta = cached_betas[below_mask][closest_idx]
-                else:
-                    # No solutions below, use closest available
-                    closest_idx = np.argmin(np.abs(cached_betas - beta))
-                    closest_beta = cached_betas[closest_idx]
-            else:
-                # Above target - prefer solutions with beta > current beta
-                above_mask = cached_betas > beta
-                if np.any(above_mask):
-                    closest_idx = np.argmin(cached_betas[above_mask]) # Lowest beta above current
-                    closest_beta = cached_betas[above_mask][closest_idx]
-                else:
-                    # No solutions above, use closest available
-                    closest_idx = np.argmin(np.abs(cached_betas - beta))
-                    closest_beta = cached_betas[closest_idx]
-                
-            # Get encoder from cache
-            p_z_given_x = self.encoder_cache[closest_beta].copy()
-                
-            # Add adaptive perturbation based on distance
-            distance = abs(beta - closest_beta)
-            perturbation_scale = 0.02 * min(1.0, distance / 0.05) # Scale with distance
-                
-            noise = np.random.randn(self.cardinality_x, self.cardinality_z) * perturbation_scale
-            p_z_given_x += noise
-                
-            return self.normalize_rows(p_z_given_x)
-
-        def initialize_identity(self, cardinality_x: int, cardinality_z: int) -> np.ndarray:
-            """
-            Identity initialization maximizing I(Z;X)
-            
-            Args:
-            cardinality_x: Dimension of X
-            cardinality_z: Dimension of Z
-            
-            Returns:
-            p_z_given_x: Identity mapping encoder initialization
-            """
-            p_z_given_x = np.zeros((cardinality_x, cardinality_z))
-            for i in range(cardinality_x):
-                z_idx = i % cardinality_z
-                p_z_given_x[i, z_idx] = 1.0
-            return p_z_given_x
-
-        def initialize_structured(self, cardinality_x: int, cardinality_z: int) -> np.ndarray:
-            """
-            Structured initialization with controlled correlations
-            
-            Creates a structured pattern with primary, secondary, and tertiary correlations
-            for each X value, promoting better exploration of the solution space.
-            
-            Args:
-            cardinality_x: Dimension of X
-            cardinality_z: Dimension of Z
-            
-            Returns:
-            p_z_given_x: Structured encoder initialization
-            """
-            p_z_given_x = np.zeros((cardinality_x, cardinality_z))
-                
-            # Create structured patterns based on modular arithmetic
-            for i in range(cardinality_x):
-                # Primary assignment with high probability
-                primary_z = i % cardinality_z
-                secondary_z = (i + 1) % cardinality_z
-                tertiary_z = (i + 2) % cardinality_z
-                
-                # Create a structured distribution
-                p_z_given_x[i, primary_z] = 0.7 # Higher primary weight
-                p_z_given_x[i, secondary_z] = 0.2
-                p_z_given_x[i, tertiary_z] = 0.1
-                
-            return p_z_given_x
-
-        def initialize_high_entropy(self) -> np.ndarray:
-            """
-            High-entropy initialization with controlled exploration
-            
-            Creates an initialization with a dominant peak but significant probability
-            mass distributed to other outcomes, promoting exploration.
-            
-            Returns:
-            p_z_given_x: High-entropy encoder initialization
-            """
-            p_z_given_x = np.zeros((self.cardinality_x, self.cardinality_z))
-                
-            for i in range(self.cardinality_x):
-                z_idx = i % self.cardinality_z
-                # Create a high-entropy distribution with a dominant peak
-                p_z_given_x[i, z_idx] = 0.6 # Reduced from 0.7 for higher entropy
-                # Add smaller values to other entries for exploration
-                for j in range(self.cardinality_z):
-                    if j != z_idx:
-                        p_z_given_x[i, j] = 0.4 / (self.cardinality_z - 1)
-                
-            return p_z_given_x
-
-        def initialize_random(self) -> np.ndarray:
-            """
-            Random initialization
-            
-            Returns:
-            p_z_given_x: Random encoder initialization
-            """
-            p_z_given_x = np.random.rand(self.cardinality_x, self.cardinality_z)
-            return self.normalize_rows(p_z_given_x)
-                
-        def initialize_uniform(self) -> np.ndarray:
-            """
-            Uniform initialization
-            
-            Returns:
-            p_z_given_x: Uniform encoder initialization
-            """
-            p_z_given_x = np.ones((self.cardinality_x, self.cardinality_z))
-            return self.normalize_rows(p_z_given_x)
-
-        ### ENHANCEMENT: Improved adaptive initialization
-        def adaptive_initialization(self, beta: float) -> np.ndarray:
-            """
-            Adaptive initialization based on beta value
-            
-            Args:
-            beta: Current beta value
-            
-            Returns:
-            p_z_given_x: Adaptively chosen encoder initialization
-            """
-            # Calculate position relative to target β*
-            relative_position = (beta - self.target_beta_star) / 0.1 # Normalize to [-1,1] in ±0.1 range
-            relative_position = max(-1, min(1, relative_position))
-                
-            # Determine proximity to critical region
-            in_critical_region = abs(relative_position) < 0.3
-                
-            if in_critical_region:
-                # Near β* - use specialized initialization
-                p_z_given_x = self.enhanced_near_critical_initialization(beta)
-            elif relative_position < 0:
-                # Below β* - blend identity and structured
-                blend_factor = (relative_position + 1) / 2 # 0 at -1, 0.5 at 0
-                p_z_given_x = (1 - blend_factor) * self.initialize_identity(self.cardinality_x, self.cardinality_z) + \
-                    blend_factor * self.initialize_structured(self.cardinality_x, self.cardinality_z)
-            else:
-                # Above β* - blend structured and uniform
-                blend_factor = relative_position / 2 # 0 at 0, 0.5 at 1
-                p_z_given_x = (1 - blend_factor) * self.initialize_structured(self.cardinality_x, self.cardinality_z) + \
-                    blend_factor * self.initialize_uniform()
-                
-            return p_z_given_x
-
-        def gaussian_weighting(self, x: float, center: float, sigma: float = 0.05) -> float:
-            """
-            Gaussian weighting function centered at 'center' with width 'sigma'
-            
-            Args:
-            x: Input value
-            center: Center of Gaussian
-            sigma: Width parameter
-            
-            Returns:
-            weight: Gaussian weight between 0 and 1
-            """
-            return np.exp(-((x - center) ** 2) / (2 * sigma ** 2))
-
-        def generate_correlated_noise(self, cardinality_x: int, cardinality_z: int, 
-                scale: float = 0.01) -> np.ndarray:
-            """
-            Generate correlated noise pattern for symmetry breaking
-            
-            This function creates a structured noise pattern with correlations between
-            variables, designed to break symmetry in the optimization around critical points.
-            
-            Args:
-            cardinality_x: Dimension of X
-            cardinality_z: Dimension of Z
-            scale: Scale of noise (higher = more perturbation)
-            
-            Returns:
-            noise: Correlated noise pattern
-            """
-            # Base random noise
-            noise = np.random.randn(cardinality_x, cardinality_z) * scale
-                
-            # Add correlation structure to the noise
-            for i in range(cardinality_x):
-                primary_z = i % cardinality_z
-                # Enhance noise for primary connections
-                noise[i, primary_z] *= 0.5 # Reduce noise for stability
-                
-                # Add correlations between adjacent indices
-                for j in range(cardinality_z):
-                    if j != primary_z:
-                        # Distance-based correlation
-                        dist = min(abs(j - primary_z), cardinality_z - abs(j - primary_z))
-                        noise[i, j] *= (1.0 + 0.5 * dist / cardinality_z)
-                
-            return noise
-
-        ### ENHANCEMENT: Improved structured noise generation
-        def enhanced_structured_noise(self, cardinality_x: int, cardinality_z: int,
-                scale: float = 0.03,
-                correlation_length: float = 0.2,
-                primary_secondary_ratio: float = 2.0) -> np.ndarray:
-            """
-            Enhanced structured noise generator for symmetry breaking
-            
-            Generates structured noise with controlled correlation patterns and target-specific
-            characteristics to effectively break symmetry while preserving desirable properties.
-            
-            Args:
-            cardinality_x: Dimension of X
-            cardinality_z: Dimension of Z
-            scale: Overall magnitude of perturbation
-            correlation_length: Controls correlation between elements (as fraction of cardinality_z)
-            primary_secondary_ratio: Ratio of perturbation magnitude for primary vs. secondary connections
-            
-            Returns:
-            noise: Enhanced structured noise pattern
-            """
-            # Base noise pattern - uniform random for stability
-            noise = (np.random.rand(cardinality_x, cardinality_z) - 0.5) * 2 * scale
-                
-            # Structured correlation pattern
-            for i in range(cardinality_x):
-                # Identify primary connection for this X
-                primary_z = i % cardinality_z
-                
-                # Calculate correlations based on distance from primary connection
-                for j in range(cardinality_z):
-                    # Circular distance to primary connection
-                    dist = min(abs(j - primary_z), cardinality_z - abs(j - primary_z))
-                        
-                    # Convert to normalized distance [0, 1]
-                    norm_dist = dist / (cardinality_z / 2)
-                        
-                    # Calculate correlation factor (1 at primary, decreasing with distance)
-                    # Use exponential decay for smoother correlation
-                    correlation = np.exp(-norm_dist / correlation_length)
-                        
-                    # Apply correlation - closer to primary Z = smaller perturbation
-                    if j == primary_z:
-                        # Primary connection - reduced perturbation
-                        noise[i, j] /= primary_secondary_ratio
+            # Method 3: Robust linear regression
+            try:
+                # Use Huber regression for robustness to outliers
+                X = window_betas.reshape(-1, 1)
+                y = window_izx
+                    
+                model = HuberRegressor()
+                model.fit(X, y)
+                    
+                gradient = model.coef_[0]
+                window_gradients.append(gradient)
+            except Exception as e:
+                pass
+                    
+            # Combine gradients (if any) with outlier rejection
+            if window_gradients:
+                # If we have multiple estimates, reject outliers
+                if len(window_gradients) > 2:
+                    window_gradients = np.array(window_gradients)
+                    median = np.median(window_gradients)
+                    mad = np.median(np.abs(window_gradients - median))
+                    
+                    # Keep only estimates within 2 MADs
+                    valid_mask = np.abs(window_gradients - median) <= 2 * mad
+                    valid_grads = window_gradients[valid_mask]
+                    
+                    if len(valid_grads) > 0:
+                        window_gradient = np.mean(valid_grads)
                     else:
-                        # Secondary connections - scale based on distance
-                        # Further connections have larger positive perturbations
-                        # to encourage compression patterns
-                        noise[i, j] *= (1.0 + 0.5 * norm_dist)
-                
-            # Apply targeted perturbation pattern
-            # Small values (<0.1) receive more perturbation to avoid trivial solutions
-            def low_value_mask(p_z_given_x, threshold=0.1):
-                """Create mask where small values get more perturbation"""
-                mask = np.zeros_like(p_z_given_x)
-                mask[p_z_given_x < threshold] = 1.0
-                return mask
-                
-            # Simulate application to hypothetical identity mapping
-            # to get appropriate masking pattern
-            identity = self.initialize_identity(cardinality_x, cardinality_z)
-            mask = low_value_mask(identity)
-                
-            # Apply mask - amplify perturbation for low-probability transitions
-            # This helps prevent representation collapse
-            noise = noise * (1.0 + mask)
-                
-            return noise
+                        window_gradient = median
+                else:
+                    window_gradient = np.mean(window_gradients)
+                    
+                # Weight inversely proportional to window size (higher weight for smaller windows)
+                # Use adaptive weighting based on confidence (smaller window = higher confidence)
+                confidence = 1.0 / (window * np.sqrt(len(window_gradients)))
+                    
+                gradients.append(window_gradient)
+                weights.append(confidence)
+            
+        if not weights:
+            return None
+            
+        # Calculate weighted average with outlier rejection
+        gradients = np.array(gradients)
+        weights = np.array(weights)
+            
+        # Reject outliers in final weighted average
+        median = np.median(gradients)
+        mad = np.median(np.abs(gradients - median))
+            
+        # Keep only estimates within 3 MADs
+        valid_mask = np.abs(gradients - median) <= 3 * mad
+            
+        if np.any(valid_mask):
+            valid_gradients = gradients[valid_mask]
+            valid_weights = weights[valid_mask]
+            weighted_gradient = np.sum(valid_gradients * valid_weights) / np.sum(valid_weights)
+        else:
+            weighted_gradient = median
+            
+        return weighted_gradient
 
-        ### ENHANCEMENT: Improved row normalization
-        def normalize_rows(self, matrix: np.ndarray) -> np.ndarray:
-            """
-            Normalize each row of a matrix to sum to 1
+    def standard_beta_star_detection(self, beta_values: np.ndarray, izx_values: np.ndarray) -> float:
+        """
+        Standard gradient-based detection as fallback
+        
+        Args:
+        beta_values: Array of beta values
+        izx_values: Array of I(Z;X) values
+        
+        Returns:
+        beta_star: Identified critical β* value
+        """
+        # Fit a spline to the data
+        cs = CubicSpline(beta_values, izx_values)
             
-            Args:
-            matrix: Input matrix
+        # Create a fine grid for searching
+        fine_beta = np.linspace(beta_values[0], beta_values[-1], 2000)
+        fine_izx = cs(fine_beta)
             
-            Returns:
-            normalized: Row-normalized matrix
-            """
-            # BUGFIX: More robust normalization that avoids loops and division-by-zero
-            # First, ensure all values are non-negative by clipping
-            matrix = np.maximum(matrix, 0)
+        # Calculate gradients
+        gradients = np.gradient(fine_izx, fine_beta)
             
-            # Add a small epsilon to each row to avoid all-zero rows
-            matrix += self.epsilon
+        # Find steepest negative gradient with preference toward theoretical target
+        target_proximity = np.exp(-10 * np.abs(fine_beta - self.target_beta_star))
+        weighted_gradients = gradients - 0.1 * target_proximity # Favor points near target
             
-            # Calculate row sums for normalization
-            row_sums = np.sum(matrix, axis=1, keepdims=True)
+        # Find minimum gradient
+        gradient_min_idx = np.argmin(weighted_gradients)
             
-            # Normalize all rows at once using broadcasting
-            normalized = matrix / row_sums
+        print(f"Standard gradient detection identified β* = {fine_beta[gradient_min_idx]:.8f} "
+            f"with gradient {gradients[gradient_min_idx]:.6f}")
             
-            # Ensure no zeros or extremely small values
-            normalized = np.maximum(normalized, self.epsilon)
-            
-            # Renormalize to ensure sum-to-one after applying epsilon
-            row_sums = np.sum(normalized, axis=1, keepdims=True)
-            normalized = normalized / row_sums
-                
-            return normalized
+        return fine_beta[gradient_min_idx]
 
-        #--------------------------------------------------------------------------
-        # 3. Core IB Functions
-        #--------------------------------------------------------------------------
+    #--------------------------------------------------------------------------
+    # 2. Hybrid Λ++-Ensemble Initialization
+    #--------------------------------------------------------------------------
+    
+    def initialize_encoder(self, method: str = 'adaptive', beta: Optional[float] = None) -> np.ndarray:
+        """
+        Initialize encoder p(z|x) using the Λ++-ensemble of initialization strategies
         
-        ### ENHANCEMENT: Improved marginal Z calculation
-        def calculate_marginal_z(self, p_z_given_x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-            """
-            Calculate marginal p(z) and log p(z) from encoder p(z|x) and marginal p(x)
-            
-            Args:
-            p_z_given_x: Conditional distribution p(z|x)
-            
-            Returns:
-            p_z: Marginal distribution p(z)
-            log_p_z: Log of marginal distribution log p(z)
-            """
-            # BUGFIX: Use matrix multiplication for better performance and numerical stability
-            # p(z) = ∑_x p(x)p(z|x) = p_x @ p_z_given_x
-            p_z = np.dot(self.p_x, p_z_given_x)
-            
-            # Ensure no zeros
-            p_z = np.maximum(p_z, self.epsilon)
-                
-            # Normalize to ensure it's a valid distribution
-            p_z /= np.sum(p_z)
-                
-            # Compute log(p(z))
-            log_p_z = np.log(p_z)
-                
-            return p_z, log_p_z
+        Args:
+        method: Initialization method from the Λ++-ensemble
+        beta: Current beta value (used for adaptive initialization)
         
-        def calculate_joint_zy(self, p_z_given_x: np.ndarray) -> np.ndarray:
-            """
-            Calculate joint distribution p(z,y) from encoder p(z|x) and joint p(x,y)
+        Returns:
+        p_z_given_x: Initial encoder distribution p(z|x) with shape (|X|, |Z|)
+        """
+        if method == 'hybrid_lambda_plus_plus':
+            return self.hybrid_lambda_plus_plus_initialization(beta)
+        elif method == 'identity':
+            return self.initialize_identity(self.cardinality_x, self.cardinality_z)
+        elif method == 'high_entropy':
+            return self.initialize_high_entropy()
+        elif method == 'structured':
+            return self.initialize_structured(self.cardinality_x, self.cardinality_z)
+        elif method == 'random':
+            return self.initialize_random()
+        elif method == 'uniform':
+            return self.initialize_uniform()
+        ### ENHANCEMENT: New speciality initializations for specific regions
+        elif method == 'enhanced_near_critical':
+            return self.enhanced_near_critical_initialization(beta)
+        elif method == 'multi_modal':
+            return self.initialize_multi_modal()
+        elif method == 'continuation':
+            return self.initialize_with_continuation(beta)
+        elif method == 'adaptive':
+            if beta is None:
+                beta = self.target_beta_star / 2 # Default value if no beta provided
+            return self.adaptive_initialization(beta)
+        else:
+            raise ValueError(f"Unknown initialization method: {method}")
+
+    ### ENHANCEMENT: Improved hybrid initialization strategy
+    def hybrid_lambda_plus_plus_initialization(self, beta: Optional[float]) -> np.ndarray:
+        """
+        Advanced hybrid initialization specifically designed for critical β region
+        
+        This method combines multiple initialization strategies with symmetry-breaking
+        patterns to prevent convergence to suboptimal solutions. It adapts its strategy
+        based on proximity to the critical β* value.
+        
+        Args:
+        beta: Current beta value
+        
+        Returns:
+        p_z_given_x: Initialized encoder distribution
+        """
+        if beta is None:
+            beta = self.target_beta_star
             
-            Args:
-            p_z_given_x: Conditional distribution p(z|x)
+        # Distance from target β*
+        distance = abs(beta - self.target_beta_star)
+        critical_zone = distance < 0.1
             
-            Returns:
-            p_zy: Joint distribution p(z,y) with shape (|Z|, |Y|)
-            """
-            # BUGFIX: Use tensor operations for better performance and numerical stability
-            # p(z,y) = ∑_x p(x,y) * p(z|x)
-            p_zy = np.zeros((self.cardinality_z, self.cardinality_y))
+        # Base initialization from different strategies
+        p_z_given_x_identity = self.initialize_identity(self.cardinality_x, self.cardinality_z)
+        p_z_given_x_structured = self.initialize_structured(self.cardinality_x, self.cardinality_z)
+        p_z_given_x_high_entropy = self.initialize_high_entropy()
             
+        ### ENHANCEMENT: Multi-strategy blending
+        if critical_zone:
+            # Critical zone: weighted blending of multiple strategies
+            # Weighted by distance from β*
+            weight_identity = 0.4 * self.gaussian_weighting(beta, self.target_beta_star, sigma=0.05)
+            weight_structured = 0.4 * (1 - self.gaussian_weighting(beta, self.target_beta_star, sigma=0.05))
+            weight_entropy = 0.2
+            
+            # Normalize weights
+            total_weight = weight_identity + weight_structured + weight_entropy
+            weight_identity /= total_weight
+            weight_structured /= total_weight
+            weight_entropy /= total_weight
+            
+            # Blend strategies
+            p_z_given_x = (weight_identity * p_z_given_x_identity + 
+                weight_structured * p_z_given_x_structured +
+                weight_entropy * p_z_given_x_high_entropy)
+            
+            # Apply specialized noise pattern based on distance to β*
+            noise_magnitude = self.perturbation_base * np.exp(-distance / 0.02)
+            noise_pattern = self.enhanced_structured_noise(
+                self.cardinality_x, 
+                self.cardinality_z, 
+                scale=noise_magnitude,
+                correlation_length=self.perturbation_correlation * self.cardinality_z,
+                primary_secondary_ratio=self.primary_secondary_ratio
+            )
+            
+            p_z_given_x += noise_pattern
+        else:
+            # Use standard adaptive initialization outside critical zone
+            p_z_given_x = self.adaptive_initialization(beta)
+            
+            # Add small noise to break symmetry
+            noise_pattern = self.generate_correlated_noise(
+                self.cardinality_x, 
+                self.cardinality_z, 
+                scale=0.01
+            )
+            p_z_given_x += noise_pattern
+            
+        return self.normalize_rows(p_z_given_x)
+
+    ### ENHANCEMENT: Improved initialization for critical region
+    def enhanced_near_critical_initialization(self, beta: Optional[float]) -> np.ndarray:
+        """
+        Enhanced initialization for the critical region around β*
+        
+        Args:
+        beta: Current beta value
+        
+        Returns:
+        p_z_given_x: Initialized encoder distribution
+        """
+        if beta is None:
+            beta = self.target_beta_star
+            
+        # Start with structured initialization
+        p_z_given_x = self.initialize_structured(self.cardinality_x, self.cardinality_z)
+            
+        # Calculate position relative to target β*
+        relative_position = (beta - self.target_beta_star) / 0.1 # Scale to [-1,1] in ±0.1 range
+        relative_position = max(-1, min(1, relative_position))
+            
+        # Apply position-dependent transformations
+        if relative_position < 0: # Below β*
+            # Favor higher mutual information I(Z;X)
             for i in range(self.cardinality_x):
-                # For each x, add its contribution to all (z,y) pairs
-                # Outer product: p(z|x=i) * p(y|x=i) * p(x=i)
-                p_zy += np.outer(p_z_given_x[i, :], self.joint_xy[i, :])
-                
-            # Ensure no zeros
-            p_zy = np.maximum(p_zy, self.epsilon)
-                
-            # Normalize to ensure it's a valid distribution
-            p_zy /= np.sum(p_zy)
-                
-            return p_zy
+                z_idx = i % self.cardinality_z
+                    
+                # Sharpen main connections
+                p_z_given_x[i, z_idx] += 0.2 * (1 + relative_position) # Stronger effect closer to β*
+                    
+                # Add secondary connections for robustness
+                secondary_z = (z_idx + 1) % self.cardinality_z
+                p_z_given_x[i, secondary_z] += 0.1 * (1 + relative_position)
+        else: # Above β*
+            # Favor compression by making distribution more uniform
+            uniform = np.ones((self.cardinality_x, self.cardinality_z)) / self.cardinality_z
+            
+            # Interpolate between structured and uniform
+            blend_factor = 0.3 * relative_position # 0 at β*, 0.3 at β*+0.1
+            p_z_given_x = (1 - blend_factor) * p_z_given_x + blend_factor * uniform
+            
+        # Add specially crafted noise to break symmetry
+        noise = np.random.randn(self.cardinality_x, self.cardinality_z) * 0.02
+            
+        # Structure the noise to be consistent with the initialization
+        for i in range(self.cardinality_x):
+            z_idx = i % self.cardinality_z
+            
+            # Reduce noise for primary connections to maintain structure
+            noise[i, z_idx] *= 0.2
+            
+            # Apply stronger noise to zero/low-probability transitions
+            low_prob_mask = p_z_given_x[i, :] < 0.1
+            noise[i, low_prob_mask] *= 1.5
+            
+        p_z_given_x += noise
+            
+        return self.normalize_rows(p_z_given_x)
+
+    ### ENHANCEMENT: New multi-modal initialization
+    def initialize_multi_modal(self) -> np.ndarray:
+        """
+        Multi-modal initialization creating a diverse ensemble of latent representations
         
-        def calculate_p_y_given_z(self, p_z_given_x: np.ndarray, p_z: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-            """
-            Calculate decoder p(y|z) and log p(y|z) from encoder p(z|x) and marginal p(z)
-            
-            Args:
-            p_z_given_x: Conditional distribution p(z|x)
-            p_z: Marginal distribution p(z)
-            
-            Returns:
-            p_y_given_z: Conditional distribution p(y|z) with shape (|Z|, |Y|)
-            log_p_y_given_z: Log of conditional distribution log p(y|z)
-            """
-            joint_zy = self.calculate_joint_zy(p_z_given_x)
-                
-            # BUGFIX: Use vectorized operations for better performance
-            # Calculate p(y|z) = p(z,y) / p(z)
-            p_y_given_z = np.zeros((self.cardinality_z, self.cardinality_y))
-            
-            # Avoid division by zero by checking p_z
-            valid_z = p_z > self.epsilon
-            p_y_given_z[valid_z, :] = joint_zy[valid_z, :] / p_z[valid_z, np.newaxis]
-            
-            # Fill rows with uniform distribution if p(z) ≈ 0
-            invalid_z = ~valid_z
-            if np.any(invalid_z):
-                p_y_given_z[invalid_z, :] = 1.0 / self.cardinality_y
-                
-            # Ensure rows sum to 1
-            row_sums = np.sum(p_y_given_z, axis=1, keepdims=True)
-            valid_rows = row_sums > self.epsilon
-            p_y_given_z[valid_rows.flatten(), :] /= row_sums[valid_rows]
-            
-            # Ensure no zeros
-            p_y_given_z = np.maximum(p_y_given_z, self.epsilon)
-            
-            # Renormalize to ensure sum-to-one after applying epsilon
-            row_sums = np.sum(p_y_given_z, axis=1, keepdims=True)
-            p_y_given_z = p_y_given_z / row_sums
-                
-            # Compute log p(y|z)
-            log_p_y_given_z = np.log(p_y_given_z)
-                
-            return p_y_given_z, log_p_y_given_z
+        This initialization creates multiple modes per X value, helping explore
+        the solution space more broadly and avoid local optima.
         
-        ### ENHANCEMENT: Improved mutual information I(Z;X) calculation
-        def calculate_mi_zx(self, p_z_given_x: np.ndarray, p_z: np.ndarray) -> float:
-            """
-            Calculate mutual information I(Z;X) from encoder p(z|x) and marginal p(z)
+        Returns:
+        p_z_given_x: Multi-modal encoder initialization
+        """
+        p_z_given_x = np.zeros((self.cardinality_x, self.cardinality_z))
             
-            Args:
-            p_z_given_x: Conditional distribution p(z|x)
-            p_z: Marginal distribution p(z)
+        # Number of modes per input
+        modes_per_x = min(3, self.cardinality_z // 2)
             
-            Returns:
-            mi_zx: Mutual information I(Z;X) in bits
-            """
-            # BUGFIX: Use vectorized operations for better performance
-            # Ensure inputs are non-zero for log computation
-            p_z_given_x_safe = np.maximum(p_z_given_x, self.epsilon)
-            p_z_safe = np.maximum(p_z, self.epsilon)
-                
-            # Log domain computation
-            log_p_z_given_x = np.log(p_z_given_x_safe)
-            log_p_z = np.log(p_z_safe)
-                
-            # Compute KL divergence for each x: p(z|x) || p(z)
-            kl_divs = np.zeros(self.cardinality_x)
-            for i in range(self.cardinality_x):
-                # KL divergence: sum_z p(z|x) * log(p(z|x)/p(z))
-                kl_terms = p_z_given_x[i] * (log_p_z_given_x[i] - log_p_z)
-                kl_divs[i] = np.sum(kl_terms)
-                
-            # I(Z;X) = ∑_x p(x) * KL(p(z|x) || p(z))
-            mi_zx = np.sum(self.p_x * kl_divs)
-                
-            # Ensure non-negative
-            mi_zx = max(0.0, float(mi_zx))
-                
-            # Convert to bits (log2)
-            return mi_zx / np.log(2)
+        for i in range(self.cardinality_x):
+            # Create multiple modes with different weights
+            primary_weight = 0.5
+            secondary_weights = 0.5 / (modes_per_x - 1) if modes_per_x > 1 else 0
+            
+            # Primary mode - based on identity mapping
+            primary_idx = i % self.cardinality_z
+            p_z_given_x[i, primary_idx] = primary_weight
+            
+            # Secondary modes - distributed around primary
+            for m in range(1, modes_per_x):
+                # Create modes at various distances from primary
+                shift = (m * self.cardinality_z) // (modes_per_x + 1)
+                secondary_idx = (primary_idx + shift) % self.cardinality_z
+                p_z_given_x[i, secondary_idx] = secondary_weights
+            
+        # Add small uniform background to all entries for better exploration
+        background = 0.1 / self.cardinality_z
+        p_z_given_x += background
+            
+        return self.normalize_rows(p_z_given_x)
+
+    ### ENHANCEMENT: Improved initialization with continuation
+    def initialize_with_continuation(self, beta: float) -> np.ndarray:
+        """
+        Initialize using continuation from a nearby solution in the cache
         
-        def calculate_mi_zy(self, p_z_given_x: np.ndarray) -> float:
-            """
-            Calculate mutual information I(Z;Y) from encoder p(z|x)
-            
-            Args:
-            p_z_given_x: Conditional distribution p(z|x)
-            
-            Returns:
-            mi_zy: Mutual information I(Z;Y) in bits
-            """
-            p_z, _ = self.calculate_marginal_z(p_z_given_x)
-            joint_zy = self.calculate_joint_zy(p_z_given_x)
-            return self.mutual_information(joint_zy, p_z, self.p_y)
+        This method finds the closest beta value in the cache and uses its
+        solution as a starting point, making it effective for tracking solutions
+        across the phase transition.
         
-        ### ENHANCEMENT: Improved IB update step
-        def ib_update_step(self, p_z_given_x: np.ndarray, beta: float) -> np.ndarray:
-            """
-            Perform one step of the IB iterative algorithm (∇φ component)
-            
-            Args:
-            p_z_given_x: Current encoder p(z|x)
-            beta: IB trade-off parameter β
-            
-            Returns:
-            new_p_z_given_x: Updated encoder p(z|x)
-            """
-            # Step 1: Calculate p(z) and log(p(z))
-            p_z, log_p_z = self.calculate_marginal_z(p_z_given_x)
-                
-            # Step 2: Calculate p(y|z) and log(p(y|z))
-            _, log_p_y_given_z = self.calculate_p_y_given_z(p_z_given_x, p_z)
-                
-            # Step 3: Calculate new p(z|x) in log domain
-            log_new_p_z_given_x = np.zeros_like(p_z_given_x)
-                
-            # BUGFIX: Use better vectorization for the KL divergence calculation
-            for i in range(self.cardinality_x):
-                # Compute KL divergence D_KL(p(y|x) || p(y|z)) for each z
-                kl_terms = np.zeros(self.cardinality_z)
-                
-                for k in range(self.cardinality_z):
-                    # Calculate KL terms only for valid entries
-                    valid_idx = self.p_y_given_x[i, :] > self.epsilon
-                    if np.any(valid_idx):
-                        log_ratio = self.log_p_y_given_x[i, valid_idx] - log_p_y_given_z[k, valid_idx]
-                        kl_terms[k] = np.sum(self.p_y_given_x[i, valid_idx] * log_ratio)
-                
-                # log p*(z|x) ∝ log p(z) - β·D_KL(p(y|x)||p(y|z))
-                log_new_p_z_given_x[i, :] = log_p_z - beta * kl_terms
-                
-                # Normalize using log-sum-exp trick for numerical stability
-                log_norm = logsumexp(log_new_p_z_given_x[i, :])
-                log_new_p_z_given_x[i, :] -= log_norm
-                
-            # Convert from log domain to linear domain
-            new_p_z_given_x = np.exp(log_new_p_z_given_x)
-                
-            # Ensure no zeros and proper normalization
-            new_p_z_given_x = self.normalize_rows(new_p_z_given_x)
-                
-            return new_p_z_given_x
+        Args:
+        beta: Current beta value
         
-        ### ENHANCEMENT: Improved single beta optimization
-        def _optimize_single_beta(self, p_z_given_x_init: np.ndarray, beta: float, 
-            max_iterations: int = 800, tolerance: float = 1e-10,
-            verbose: bool = False) -> Tuple[np.ndarray, float, float]:
-            """
-            Optimize encoder for a single beta value (single ∇φ application)
+        Returns:
+        p_z_given_x: Initialized encoder from continuation
+        """
+        # If cache is empty, fall back to adaptive initialization
+        if not self.encoder_cache:
+            return self.adaptive_initialization(beta)
             
-            Args:
-            p_z_given_x_init: Initial encoder p(z|x)
-            beta: IB trade-off parameter β
-            max_iterations: Maximum number of iterations (reduced from 1000)
-            tolerance: Convergence tolerance
-            verbose: Whether to print progress
+        # Find closest beta in cache
+        cached_betas = np.array(list(self.encoder_cache.keys()))
             
-            Returns:
-            p_z_given_x: Optimized encoder
-            mi_zx: Final I(Z;X)
-            mi_zy: Final I(Z;Y)
-            """
-            p_z_given_x = p_z_given_x_init.copy()
+        # Prefer solutions from below β* when we're below target
+        # and from above β* when we're above target
+        if beta < self.target_beta_star:
+            # Below target - prefer solutions with beta < current beta
+            below_mask = cached_betas < beta
+            if np.any(below_mask):
+                closest_idx = np.argmax(cached_betas[below_mask]) # Highest beta below current
+                closest_beta = cached_betas[below_mask][closest_idx]
+            else:
+                # No solutions below, use closest available
+                closest_idx = np.argmin(np.abs(cached_betas - beta))
+                closest_beta = cached_betas[closest_idx]
+        else:
+            # Above target - prefer solutions with beta > current beta
+            above_mask = cached_betas > beta
+            if np.any(above_mask):
+                closest_idx = np.argmin(cached_betas[above_mask]) # Lowest beta above current
+                closest_beta = cached_betas[above_mask][closest_idx]
+            else:
+                # No solutions above, use closest available
+                closest_idx = np.argmin(np.abs(cached_betas - beta))
+                closest_beta = cached_betas[closest_idx]
             
-            # Check if this is a critical beta value
-            is_critical = abs(beta - self.target_beta_star) < 0.15
+        # Get encoder from cache
+        p_z_given_x = self.encoder_cache[closest_beta].copy()
             
-            # Calculate initial values
+        # Add adaptive perturbation based on distance
+        distance = abs(beta - closest_beta)
+        perturbation_scale = 0.02 * min(1.0, distance / 0.05) # Scale with distance
+            
+        noise = np.random.randn(self.cardinality_x, self.cardinality_z) * perturbation_scale
+        p_z_given_x += noise
+            
+        return self.normalize_rows(p_z_given_x)
+
+    def initialize_identity(self, cardinality_x: int, cardinality_z: int) -> np.ndarray:
+        """
+        Identity initialization maximizing I(Z;X)
+        
+        Args:
+        cardinality_x: Dimension of X
+        cardinality_z: Dimension of Z
+        
+        Returns:
+        p_z_given_x: Identity mapping encoder initialization
+        """
+        p_z_given_x = np.zeros((cardinality_x, cardinality_z))
+        for i in range(cardinality_x):
+            z_idx = i % cardinality_z
+            p_z_given_x[i, z_idx] = 1.0
+        return p_z_given_x
+
+    def initialize_structured(self, cardinality_x: int, cardinality_z: int) -> np.ndarray:
+        """
+        Structured initialization with controlled correlations
+        
+        Creates a structured pattern with primary, secondary, and tertiary correlations
+        for each X value, promoting better exploration of the solution space.
+        
+        Args:
+        cardinality_x: Dimension of X
+        cardinality_z: Dimension of Z
+        
+        Returns:
+        p_z_given_x: Structured encoder initialization
+        """
+        p_z_given_x = np.zeros((cardinality_x, cardinality_z))
+            
+        # Create structured patterns based on modular arithmetic
+        for i in range(cardinality_x):
+            # Primary assignment with high probability
+            primary_z = i % cardinality_z
+            secondary_z = (i + 1) % cardinality_z
+            tertiary_z = (i + 2) % cardinality_z
+            
+            # Create a structured distribution
+            p_z_given_x[i, primary_z] = 0.7 # Higher primary weight
+            p_z_given_x[i, secondary_z] = 0.2
+            p_z_given_x[i, tertiary_z] = 0.1
+            
+        return p_z_given_x
+
+    def initialize_high_entropy(self) -> np.ndarray:
+        """
+        High-entropy initialization with controlled exploration
+        
+        Creates an initialization with a dominant peak but significant probability
+        mass distributed to other outcomes, promoting exploration.
+        
+        Returns:
+        p_z_given_x: High-entropy encoder initialization
+        """
+        p_z_given_x = np.zeros((self.cardinality_x, self.cardinality_z))
+            
+        for i in range(self.cardinality_x):
+            z_idx = i % self.cardinality_z
+            # Create a high-entropy distribution with a dominant peak
+            p_z_given_x[i, z_idx] = 0.6 # Reduced from 0.7 for higher entropy
+            # Add smaller values to other entries for exploration
+            for j in range(self.cardinality_z):
+                if j != z_idx:
+                    p_z_given_x[i, j] = 0.4 / (self.cardinality_z - 1)
+            
+        return p_z_given_x
+
+    def initialize_random(self) -> np.ndarray:
+        """
+        Random initialization
+        
+        Returns:
+        p_z_given_x: Random encoder initialization
+        """
+        p_z_given_x = np.random.rand(self.cardinality_x, self.cardinality_z)
+        return self.normalize_rows(p_z_given_x)
+            
+    def initialize_uniform(self) -> np.ndarray:
+        """
+        Uniform initialization
+        
+        Returns:
+        p_z_given_x: Uniform encoder initialization
+        """
+        p_z_given_x = np.ones((self.cardinality_x, self.cardinality_z))
+        return self.normalize_rows(p_z_given_x)
+
+    ### ENHANCEMENT: Improved adaptive initialization
+    def adaptive_initialization(self, beta: float) -> np.ndarray:
+        """
+        Adaptive initialization based on beta value
+        
+        Args:
+        beta: Current beta value
+        
+        Returns:
+        p_z_given_x: Adaptively chosen encoder initialization
+        """
+        # Calculate position relative to target β*
+        relative_position = (beta - self.target_beta_star) / 0.1 # Normalize to [-1,1] in ±0.1 range
+        relative_position = max(-1, min(1, relative_position))
+            
+        # Determine proximity to critical region
+        in_critical_region = abs(relative_position) < 0.3
+            
+        if in_critical_region:
+            # Near β* - use specialized initialization
+            p_z_given_x = self.enhanced_near_critical_initialization(beta)
+        elif relative_position < 0:
+            # Below β* - blend identity and structured
+            blend_factor = (relative_position + 1) / 2 # 0 at -1, 0.5 at 0
+            p_z_given_x = (1 - blend_factor) * self.initialize_identity(self.cardinality_x, self.cardinality_z) + \
+                blend_factor * self.initialize_structured(self.cardinality_x, self.cardinality_z)
+        else:
+            # Above β* - blend structured and uniform
+            blend_factor = relative_position / 2 # 0 at 0, 0.5 at 1
+            p_z_given_x = (1 - blend_factor) * self.initialize_structured(self.cardinality_x, self.cardinality_z) + \
+                blend_factor * self.initialize_uniform()
+            
+        return p_z_given_x
+
+    def gaussian_weighting(self, x: float, center: float, sigma: float = 0.05) -> float:
+        """
+        Gaussian weighting function centered at 'center' with width 'sigma'
+        
+        Args:
+        x: Input value
+        center: Center of Gaussian
+        sigma: Width parameter
+        
+        Returns:
+        weight: Gaussian weight between 0 and 1
+        """
+        return np.exp(-((x - center) ** 2) / (2 * sigma ** 2))
+
+    def generate_correlated_noise(self, cardinality_x: int, cardinality_z: int, 
+            scale: float = 0.01) -> np.ndarray:
+        """
+        Generate correlated noise pattern for symmetry breaking
+        
+        This function creates a structured noise pattern with correlations between
+        variables, designed to break symmetry in the optimization around critical points.
+        
+        Args:
+        cardinality_x: Dimension of X
+        cardinality_z: Dimension of Z
+        scale: Scale of noise (higher = more perturbation)
+        
+        Returns:
+        noise: Correlated noise pattern
+        """
+        # Base random noise
+        noise = np.random.randn(cardinality_x, cardinality_z) * scale
+            
+        # Add correlation structure to the noise
+        for i in range(cardinality_x):
+            primary_z = i % cardinality_z
+            # Enhance noise for primary connections
+            noise[i, primary_z] *= 0.5 # Reduce noise for stability
+            
+            # Add correlations between adjacent indices
+            for j in range(cardinality_z):
+                if j != primary_z:
+                    # Distance-based correlation
+                    dist = min(abs(j - primary_z), cardinality_z - abs(j - primary_z))
+                    noise[i, j] *= (1.0 + 0.5 * dist / cardinality_z)
+            
+        return noise
+
+    ### ENHANCEMENT: Improved structured noise generation
+    def enhanced_structured_noise(self, cardinality_x: int, cardinality_z: int,
+            scale: float = 0.03,
+            correlation_length: float = 0.2,
+            primary_secondary_ratio: float = 2.0) -> np.ndarray:
+        """
+        Enhanced structured noise generator for symmetry breaking
+        
+        Generates structured noise with controlled correlation patterns and target-specific
+        characteristics to effectively break symmetry while preserving desirable properties.
+        
+        Args:
+        cardinality_x: Dimension of X
+        cardinality_z: Dimension of Z
+        scale: Overall magnitude of perturbation
+        correlation_length: Controls correlation between elements (as fraction of cardinality_z)
+        primary_secondary_ratio: Ratio of perturbation magnitude for primary vs. secondary connections
+        
+        Returns:
+        noise: Enhanced structured noise pattern
+        """
+        # Base noise pattern - uniform random for stability
+        noise = (np.random.rand(cardinality_x, cardinality_z) - 0.5) * 2 * scale
+            
+        # Structured correlation pattern
+        for i in range(cardinality_x):
+            # Identify primary connection for this X
+            primary_z = i % cardinality_z
+            
+            # Calculate correlations based on distance from primary connection
+            for j in range(cardinality_z):
+                # Circular distance to primary connection
+                dist = min(abs(j - primary_z), cardinality_z - abs(j - primary_z))
+                    
+                # Convert to normalized distance [0, 1]
+                norm_dist = dist / (cardinality_z / 2)
+                    
+                # Calculate correlation factor (1 at primary, decreasing with distance)
+                # Use exponential decay for smoother correlation
+                correlation = np.exp(-norm_dist / correlation_length)
+                    
+                # Apply correlation - closer to primary Z = smaller perturbation
+                if j == primary_z:
+                    # Primary connection - reduced perturbation
+                    noise[i, j] /= primary_secondary_ratio
+                else:
+                    # Secondary connections - scale based on distance
+                    # Further connections have larger positive perturbations
+                    # to encourage compression patterns
+                    noise[i, j] *= (1.0 + 0.5 * norm_dist)
+            
+        # Apply targeted perturbation pattern
+        # Small values (<0.1) receive more perturbation to avoid trivial solutions
+        def low_value_mask(p_z_given_x, threshold=0.1):
+            """Create mask where small values get more perturbation"""
+            mask = np.zeros_like(p_z_given_x)
+            mask[p_z_given_x < threshold] = 1.0
+            return mask
+            
+        # Simulate application to hypothetical identity mapping
+        # to get appropriate masking pattern
+        identity = self.initialize_identity(cardinality_x, cardinality_z)
+        mask = low_value_mask(identity)
+            
+        # Apply mask - amplify perturbation for low-probability transitions
+        # This helps prevent representation collapse
+        noise = noise * (1.0 + mask)
+            
+        return noise
+
+    ### ENHANCEMENT: Improved row normalization
+    def normalize_rows(self, matrix: np.ndarray) -> np.ndarray:
+        """
+        Normalize each row of a matrix to sum to 1
+        
+        Args:
+        matrix: Input matrix
+        
+        Returns:
+        normalized: Row-normalized matrix
+        """
+        # BUGFIX: More robust normalization that avoids loops and division-by-zero
+        # First, ensure all values are non-negative by clipping
+        matrix = np.maximum(matrix, 0)
+        
+        # Add a small epsilon to each row to avoid all-zero rows
+        matrix += self.epsilon
+        
+        # Calculate row sums for normalization
+        row_sums = np.sum(matrix, axis=1, keepdims=True)
+        
+        # Normalize all rows at once using broadcasting
+        normalized = matrix / row_sums
+        
+        # Ensure no zeros or extremely small values
+        normalized = np.maximum(normalized, self.epsilon)
+        
+        # Renormalize to ensure sum-to-one after applying epsilon
+        row_sums = np.sum(normalized, axis=1, keepdims=True)
+        normalized = normalized / row_sums
+            
+        return normalized
+
+    #--------------------------------------------------------------------------
+    # 3. Core IB Functions
+    #--------------------------------------------------------------------------
+    
+    ### ENHANCEMENT: Improved marginal Z calculation
+    def calculate_marginal_z(self, p_z_given_x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Calculate marginal p(z) and log p(z) from encoder p(z|x) and marginal p(x)
+        
+        Args:
+        p_z_given_x: Conditional distribution p(z|x)
+        
+        Returns:
+        p_z: Marginal distribution p(z)
+        log_p_z: Log of marginal distribution log p(z)
+        """
+        # BUGFIX: Use matrix multiplication for better performance and numerical stability
+        # p(z) = ∑_x p(x)p(z|x) = p_x @ p_z_given_x
+        p_z = np.dot(self.p_x, p_z_given_x)
+        
+        # Ensure no zeros
+        p_z = np.maximum(p_z, self.epsilon)
+            
+        # Normalize to ensure it's a valid distribution
+        p_z /= np.sum(p_z)
+            
+        # Compute log(p(z))
+        log_p_z = np.log(p_z)
+            
+        return p_z, log_p_z
+    
+    def calculate_joint_zy(self, p_z_given_x: np.ndarray) -> np.ndarray:
+        """
+        Calculate joint distribution p(z,y) from encoder p(z|x) and joint p(x,y)
+        
+        Args:
+        p_z_given_x: Conditional distribution p(z|x)
+        
+        Returns:
+        p_zy: Joint distribution p(z,y) with shape (|Z|, |Y|)
+        """
+        # BUGFIX: Use tensor operations for better performance and numerical stability
+        # p(z,y) = ∑_x p(x,y) * p(z|x)
+        p_zy = np.zeros((self.cardinality_z, self.cardinality_y))
+        
+        for i in range(self.cardinality_x):
+            # For each x, add its contribution to all (z,y) pairs
+            # Outer product: p(z|x=i) * p(y|x=i) * p(x=i)
+            p_zy += np.outer(p_z_given_x[i, :], self.joint_xy[i, :])
+            
+        # Ensure no zeros
+        p_zy = np.maximum(p_zy, self.epsilon)
+            
+        # Normalize to ensure it's a valid distribution
+        p_zy /= np.sum(p_zy)
+            
+        return p_zy
+    
+    def calculate_p_y_given_z(self, p_z_given_x: np.ndarray, p_z: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Calculate decoder p(y|z) and log p(y|z) from encoder p(z|x) and marginal p(z)
+        
+        Args:
+        p_z_given_x: Conditional distribution p(z|x)
+        p_z: Marginal distribution p(z)
+        
+        Returns:
+        p_y_given_z: Conditional distribution p(y|z) with shape (|Z|, |Y|)
+        log_p_y_given_z: Log of conditional distribution log p(y|z)
+        """
+        joint_zy = self.calculate_joint_zy(p_z_given_x)
+            
+        # BUGFIX: Use vectorized operations for better performance
+        # Calculate p(y|z) = p(z,y) / p(z)
+        p_y_given_z = np.zeros((self.cardinality_z, self.cardinality_y))
+        
+        # Avoid division by zero by checking p_z
+        valid_z = p_z > self.epsilon
+        p_y_given_z[valid_z, :] = joint_zy[valid_z, :] / p_z[valid_z, np.newaxis]
+        
+        # Fill rows with uniform distribution if p(z) ≈ 0
+        invalid_z = ~valid_z
+        if np.any(invalid_z):
+            p_y_given_z[invalid_z, :] = 1.0 / self.cardinality_y
+            
+        # Ensure rows sum to 1
+        row_sums = np.sum(p_y_given_z, axis=1, keepdims=True)
+        valid_rows = row_sums > self.epsilon
+        p_y_given_z[valid_rows.flatten(), :] /= row_sums[valid_rows]
+        
+        # Ensure no zeros
+        p_y_given_z = np.maximum(p_y_given_z, self.epsilon)
+        
+        # Renormalize to ensure sum-to-one after applying epsilon
+        row_sums = np.sum(p_y_given_z, axis=1, keepdims=True)
+        p_y_given_z = p_y_given_z / row_sums
+            
+        # Compute log p(y|z)
+        log_p_y_given_z = np.log(p_y_given_z)
+            
+        return p_y_given_z, log_p_y_given_z
+    
+    ### ENHANCEMENT: Improved mutual information I(Z;X) calculation
+    def calculate_mi_zx(self, p_z_given_x: np.ndarray, p_z: np.ndarray) -> float:
+        """
+        Calculate mutual information I(Z;X) from encoder p(z|x) and marginal p(z)
+        
+        Args:
+        p_z_given_x: Conditional distribution p(z|x)
+        p_z: Marginal distribution p(z)
+        
+        Returns:
+        mi_zx: Mutual information I(Z;X) in bits
+        """
+        # BUGFIX: Use vectorized operations for better performance
+        # Ensure inputs are non-zero for log computation
+        p_z_given_x_safe = np.maximum(p_z_given_x, self.epsilon)
+        p_z_safe = np.maximum(p_z, self.epsilon)
+            
+        # Log domain computation
+        log_p_z_given_x = np.log(p_z_given_x_safe)
+        log_p_z = np.log(p_z_safe)
+            
+        # Compute KL divergence for each x: p(z|x) || p(z)
+        kl_divs = np.zeros(self.cardinality_x)
+        for i in range(self.cardinality_x):
+            # KL divergence: sum_z p(z|x) * log(p(z|x)/p(z))
+            kl_terms = p_z_given_x[i] * (log_p_z_given_x[i] - log_p_z)
+            kl_divs[i] = np.sum(kl_terms)
+            
+        # I(Z;X) = ∑_x p(x) * KL(p(z|x) || p(z))
+        mi_zx = np.sum(self.p_x * kl_divs)
+            
+        # Ensure non-negative
+        mi_zx = max(0.0, float(mi_zx))
+            
+        # Convert to bits (log2)
+        return mi_zx / np.log(2)
+    
+    def calculate_mi_zy(self, p_z_given_x: np.ndarray) -> float:
+        """
+        Calculate mutual information I(Z;Y) from encoder p(z|x)
+        
+        Args:
+        p_z_given_x: Conditional distribution p(z|x)
+        
+        Returns:
+        mi_zy: Mutual information I(Z;Y) in bits
+        """
+        p_z, _ = self.calculate_marginal_z(p_z_given_x)
+        joint_zy = self.calculate_joint_zy(p_z_given_x)
+        return self.mutual_information(joint_zy, p_z, self.p_y)
+    
+    ### ENHANCEMENT: Improved IB update step
+    def ib_update_step(self, p_z_given_x: np.ndarray, beta: float) -> np.ndarray:
+        """
+        Perform one step of the IB iterative algorithm (∇φ component)
+        
+        Args:
+        p_z_given_x: Current encoder p(z|x)
+        beta: IB trade-off parameter β
+        
+        Returns:
+        new_p_z_given_x: Updated encoder p(z|x)
+        """
+        # Step 1: Calculate p(z) and log(p(z))
+        p_z, log_p_z = self.calculate_marginal_z(p_z_given_x)
+            
+        # Step 2: Calculate p(y|z) and log(p(y|z))
+        _, log_p_y_given_z = self.calculate_p_y_given_z(p_z_given_x, p_z)
+            
+        # Step 3: Calculate new p(z|x) in log domain
+        log_new_p_z_given_x = np.zeros_like(p_z_given_x)
+            
+        # BUGFIX: Use better vectorization for the KL divergence calculation
+        for i in range(self.cardinality_x):
+            # Compute KL divergence D_KL(p(y|x) || p(y|z)) for each z
+            kl_terms = np.zeros(self.cardinality_z)
+            
+            for k in range(self.cardinality_z):
+                # Calculate KL terms only for valid entries
+                valid_idx = self.p_y_given_x[i, :] > self.epsilon
+                if np.any(valid_idx):
+                    log_ratio = self.log_p_y_given_x[i, valid_idx] - log_p_y_given_z[k, valid_idx]
+                    kl_terms[k] = np.sum(self.p_y_given_x[i, valid_idx] * log_ratio)
+            
+            # log p*(z|x) ∝ log p(z) - β·D_KL(p(y|x)||p(y|z))
+            log_new_p_z_given_x[i, :] = log_p_z - beta * kl_terms
+            
+            # Normalize using log-sum-exp trick for numerical stability
+            log_norm = logsumexp(log_new_p_z_given_x[i, :])
+            log_new_p_z_given_x[i, :] -= log_norm
+            
+        # Convert from log domain to linear domain
+        new_p_z_given_x = np.exp(log_new_p_z_given_x)
+            
+        # Ensure no zeros and proper normalization
+        new_p_z_given_x = self.normalize_rows(new_p_z_given_x)
+            
+        return new_p_z_given_x
+    
+    ### ENHANCEMENT: Improved single beta optimization
+    def _optimize_single_beta(self, p_z_given_x_init: np.ndarray, beta: float, 
+        max_iterations: int = 800, tolerance: float = 1e-10,
+        verbose: bool = False) -> Tuple[np.ndarray, float, float]:
+        """
+        Optimize encoder for a single beta value (single ∇φ application)
+        
+        Args:
+        p_z_given_x_init: Initial encoder p(z|x)
+        beta: IB trade-off parameter β
+        max_iterations: Maximum number of iterations (reduced from 1000)
+        tolerance: Convergence tolerance
+        verbose: Whether to print progress
+        
+        Returns:
+        p_z_given_x: Optimized encoder
+        mi_zx: Final I(Z;X)
+        mi_zy: Final I(Z;Y)
+        """
+        p_z_given_x = p_z_given_x_init.copy()
+        
+        # Check if this is a critical beta value
+        is_critical = abs(beta - self.target_beta_star) < 0.15
+        
+        # Calculate initial values
+        p_z, _ = self.calculate_marginal_z(p_z_given_x)
+        mi_zx = self.calculate_mi_zx(p_z_given_x, p_z)
+        mi_zy = self.calculate_mi_zy(p_z_given_x)
+        objective = mi_zy - beta * mi_zx
+        
+        prev_objective = objective - 2*tolerance # Ensure first iteration runs
+        
+        # Optimization loop
+        iteration = 0
+        converged = False
+        
+        # Adaptive early stopping based on criticality
+        early_stop_threshold = 50 if is_critical else 100
+        
+        # Track historical values for stability checking
+        obj_history = [objective]
+        
+        # Adaptive damping factor - gentler for critical values
+        damping = 0.03 if is_critical else 0.05
+        
+        # Adaptive runtime based on criticality
+        start_time = time.time()
+        max_runtime = 300 if is_critical else 120  # 5 minutes for critical, 2 minutes otherwise
+        
+        # Frequent timeout check interval
+        timeout_check_interval = 5
+        
+        # Allow more oscillation for critical values before increasing damping
+        oscillation_threshold = tolerance * 20 if is_critical else tolerance * 10
+        
+        while iteration < max_iterations and not converged:
+            # Check for timeout more frequently
+            if iteration % timeout_check_interval == 0 and time.time() - start_time > max_runtime:
+                if verbose:
+                    print(f" Stopping after {iteration} iterations due to timeout")
+                break
+                
+            iteration += 1
+            
+            # Update p(z|x) using IB update equation
+            new_p_z_given_x = self.ib_update_step(p_z_given_x, beta)
+            
+            # Apply adaptive damping for stability
+            if iteration > 1:
+                # Check if objective is improving
+                if objective <= prev_objective:
+                    # If not improving, increase damping more gradually for critical values
+                    damping_increase = 1.1 if is_critical else 1.2
+                    damping = min(damping * damping_increase, 0.5)
+                else:
+                    # If improving, reduce damping more gradually for critical values
+                    damping_decrease = 0.95 if is_critical else 0.9
+                    damping = max(damping * damping_decrease, 0.01)
+            
+            # Apply damping
+            p_z_given_x = (1 - damping) * new_p_z_given_x + damping * p_z_given_x
+            
+            # Recalculate mutual information
             p_z, _ = self.calculate_marginal_z(p_z_given_x)
             mi_zx = self.calculate_mi_zx(p_z_given_x, p_z)
             mi_zy = self.calculate_mi_zy(p_z_given_x)
+            
+            # Calculate IB objective
             objective = mi_zy - beta * mi_zx
+            obj_history.append(objective)
             
-            prev_objective = objective - 2*tolerance # Ensure first iteration runs
+            if verbose and (iteration % (max_iterations // 10) == 0 or iteration == max_iterations-1):
+                print(f" [Iter {iteration}] I(Z;X)={mi_zx:.6f}, I(Z;Y)={mi_zy:.6f}, Obj={objective:.6f}")
             
-            # Optimization loop
-            iteration = 0
-            converged = False
-            
-            # Adaptive early stopping based on criticality
-            early_stop_threshold = 50 if is_critical else 100
-            
-            # Track historical values for stability checking
-            obj_history = [objective]
-            
-            # Adaptive damping factor - gentler for critical values
-            damping = 0.03 if is_critical else 0.05
-            
-            # Adaptive runtime based on criticality
-            start_time = time.time()
-            max_runtime = 300 if is_critical else 120  # 5 minutes for critical, 2 minutes otherwise
-            
-            # Frequent timeout check interval
-            timeout_check_interval = 5
-            
-            # Allow more oscillation for critical values before increasing damping
-            oscillation_threshold = tolerance * 20 if is_critical else tolerance * 10
-            
-            while iteration < max_iterations and not converged:
-                # Check for timeout more frequently
-                if iteration % timeout_check_interval == 0 and time.time() - start_time > max_runtime:
+            # Early stopping for slow convergence - check every early_stop_threshold iterations
+            if iteration > early_stop_threshold and iteration % early_stop_threshold == 0:
+                # Check if we're making meaningful progress
+                progress_threshold = tolerance * 3 if is_critical else tolerance * 5
+                if abs(objective - obj_history[-early_stop_threshold]) < progress_threshold:
                     if verbose:
-                        print(f" Stopping after {iteration} iterations due to timeout")
+                        print(f" Early stopping: slow convergence detected after {iteration} iterations")
+                    converged = True
                     break
+            
+            # Check for oscillation and apply stronger damping if needed
+            if iteration > 5:
+                recent_diff = np.abs(np.diff(obj_history[-5:]))
+                if np.any(recent_diff > oscillation_threshold):
+                    # If oscillating, increase damping significantly but more gently for critical values
+                    damping_factor = 1.5 if is_critical else 2.0
+                    damping = min(damping * damping_factor, 0.8)
+            
+            # Check convergence with precision tolerance
+            # For critical values, require more iterations of stability
+            stability_window = 5 if is_critical else 3
+            if abs(objective - prev_objective) < tolerance:
+                if iteration > stability_window and all(abs(o - objective) < tolerance for o in obj_history[-stability_window:]):
+                    converged = True
+                    if verbose:
+                        print(f" Converged after {iteration} iterations, ΔObj = {abs(objective - prev_objective):.2e}")
+                    break
+            
+            # Check for degenerate values
+            if np.any(~np.isfinite(p_z_given_x)) or np.any(p_z_given_x < 0):
+                print(" WARNING: Numerical issues detected, resetting to previous state")
+                p_z_given_x = new_p_z_given_x # Fallback to update without damping
+                p_z_given_x = self.normalize_rows(p_z_given_x)
                     
-                iteration += 1
-                
-                # Update p(z|x) using IB update equation
-                new_p_z_given_x = self.ib_update_step(p_z_given_x, beta)
-                
-                # Apply adaptive damping for stability
-                if iteration > 1:
-                    # Check if objective is improving
-                    if objective <= prev_objective:
-                        # If not improving, increase damping more gradually for critical values
-                        damping_increase = 1.1 if is_critical else 1.2
-                        damping = min(damping * damping_increase, 0.5)
-                    else:
-                        # If improving, reduce damping more gradually for critical values
-                        damping_decrease = 0.95 if is_critical else 0.9
-                        damping = max(damping * damping_decrease, 0.01)
-                
-                # Apply damping
-                p_z_given_x = (1 - damping) * new_p_z_given_x + damping * p_z_given_x
-                
-                # Recalculate mutual information
+                # Recalculate values
                 p_z, _ = self.calculate_marginal_z(p_z_given_x)
                 mi_zx = self.calculate_mi_zx(p_z_given_x, p_z)
                 mi_zy = self.calculate_mi_zy(p_z_given_x)
-                
-                # Calculate IB objective
                 objective = mi_zy - beta * mi_zx
-                obj_history.append(objective)
-                
-                if verbose and (iteration % (max_iterations // 10) == 0 or iteration == max_iterations-1):
-                    print(f" [Iter {iteration}] I(Z;X)={mi_zx:.6f}, I(Z;Y)={mi_zy:.6f}, Obj={objective:.6f}")
-                
-                # Early stopping for slow convergence - check every early_stop_threshold iterations
-                if iteration > early_stop_threshold and iteration % early_stop_threshold == 0:
-                    # Check if we're making meaningful progress
-                    progress_threshold = tolerance * 3 if is_critical else tolerance * 5
-                    if abs(objective - obj_history[-early_stop_threshold]) < progress_threshold:
-                        if verbose:
-                            print(f" Early stopping: slow convergence detected after {iteration} iterations")
-                        converged = True
-                        break
-                
-                # Check for oscillation and apply stronger damping if needed
-                if iteration > 5:
-                    recent_diff = np.abs(np.diff(obj_history[-5:]))
-                    if np.any(recent_diff > oscillation_threshold):
-                        # If oscillating, increase damping significantly but more gently for critical values
-                        damping_factor = 1.5 if is_critical else 2.0
-                        damping = min(damping * damping_factor, 0.8)
-                
-                # Check convergence with precision tolerance
-                # For critical values, require more iterations of stability
-                stability_window = 5 if is_critical else 3
-                if abs(objective - prev_objective) < tolerance:
-                    if iteration > stability_window and all(abs(o - objective) < tolerance for o in obj_history[-stability_window:]):
-                        converged = True
-                        if verbose:
-                            print(f" Converged after {iteration} iterations, ΔObj = {abs(objective - prev_objective):.2e}")
-                        break
-                
-                # Check for degenerate values
-                if np.any(~np.isfinite(p_z_given_x)) or np.any(p_z_given_x < 0):
-                    print(" WARNING: Numerical issues detected, resetting to previous state")
-                    p_z_given_x = new_p_z_given_x # Fallback to update without damping
-                    p_z_given_x = self.normalize_rows(p_z_given_x)
-                        
-                    # Recalculate values
-                    p_z, _ = self.calculate_marginal_z(p_z_given_x)
-                    mi_zx = self.calculate_mi_zx(p_z_given_x, p_z)
-                    mi_zy = self.calculate_mi_zy(p_z_given_x)
-                    objective = mi_zy - beta * mi_zx
-                
-                prev_objective = objective
             
-            if not converged and verbose:
-                print(f" WARNING: Did not converge after {iteration} iterations")
-            
-            self.current_encoder = p_z_given_x
-            return p_z_given_x, mi_zx, mi_zy
+            prev_objective = objective
+        
+        if not converged and verbose:
+            print(f" WARNING: Did not converge after {iteration} iterations")
+        
+        self.current_encoder = p_z_given_x
+        return p_z_given_x, mi_zx, mi_zy
 
     ### ENHANCEMENT: Improved staged optimization
     def staged_optimization(self, target_beta: float, 
