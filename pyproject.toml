@@ -1,18 +1,21 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "betabottle"
 version = "0.0.1"
-description = "Reserved name for upcoming Alpay Algebra-based Information Bottleneck library."
+description = "β*-Optimization Validation in the Information Bottleneck Framework"
 authors = [{ name="Faruk Alpay", email="alpay@lightcap.ai" }]
-license = {text = "MIT"}
 readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
 classifiers = [
-    "Development Status :: 1 - Planning",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Topic :: Scientific/Engineering :: Information Analysis"
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
 ]
+
+[tool.setuptools]
+packages = ["betabottle"]
+include-package-data = false
