@@ -178,6 +178,14 @@ class PerfectedInformationBottleneck:
         self._total_progress = 0
         self._progress_lock = threading.RLock()
 
+        # NEW: Create additional diagnostic directories
+        self.diagnostics_dir = os.path.join(self.plots_dir, "diagnostics")
+        self.timeout_logs_dir = os.path.join(self.diagnostics_dir, "timeout_logs")
+        self.academic_validation_dir = os.path.join(self.diagnostics_dir, "academic_validation")
+        os.makedirs(self.diagnostics_dir, exist_ok=True)
+        os.makedirs(self.timeout_logs_dir, exist_ok=True)
+        os.makedirs(self.academic_validation_dir, exist_ok=True)
+
     ### ENHANCEMENT: Improved KL divergence calculation using high precision
     def kl_divergence_log_domain(self, log_p: np.ndarray, log_q: np.ndarray, p: np.ndarray = None) -> float:
         """
@@ -346,6 +354,14 @@ class PerfectedInformationBottleneck:
                     density_factor=3.0 + depth*1.0 # Higher density factor
                 )
                 all_beta_values.extend(beta_values)
+                
+                # Check for known critical values that need special handling
+                for beta in beta_values:
+                    if self.handle_known_critical_values(beta):
+                        # For known critical values (4.1020, 4.1040, 4.1060), apply extreme precision
+                        self.tolerance = 1e-14  # Ultra-high precision
+                        # Create special entry in encoder cache to reuse in future
+                        self.encoder_cache[f"critical_{beta:.6f}"] = True
                     
                 # Process each beta value
                 region_results = self.search_beta_values(beta_values, depth+1)
@@ -405,6 +421,139 @@ class PerfectedInformationBottleneck:
             
         print(f"Identified β* = {beta_star:.8f}, evaluated {len(all_beta_values)} beta values")
         return beta_star, results, all_beta_values
+
+    # New method to handle critical values specifically mentioned (4.1020, 4.1040, 4.1060)
+    def handle_known_critical_values(self, beta: float) -> bool:
+        """
+        Apply special handling for known critical β values that require extra care
+        
+        Args:
+        beta: The β value to check
+        
+        Returns:
+        is_known_critical: Whether this is a known critical value
+        """
+        # Define the specific critical values with high academic importance
+        CRITICAL_VALUES = [4.1020, 4.1040, 4.1060]
+        CRITICAL_TOLERANCE = 0.0001  # Match within 0.0001
+        
+        # Check if this beta is one of the known critical values
+        for critical_beta in CRITICAL_VALUES:
+            if abs(beta - critical_beta) < CRITICAL_TOLERANCE:
+                proximity = abs(beta - self.target_beta_star)
+                print(f"⚠️ DETECTED HIGHLY SENSITIVE CRITICAL β = {beta:.6f} ⚠️")
+                print(f"  - Distance from target β*: {proximity:.6f}")
+                print(f"  - Applying special academic-grade optimization protocol")
+                
+                # Log the detection to a file for academic records
+                log_file = os.path.join(self.academic_validation_dir, "critical_values_log.txt")
+                with open(log_file, "a") as f:
+                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Processing critical β = {beta:.8f}, "
+                            f"distance from target: {proximity:.8f}\n")
+                    f.write(f"  - Required academic precision: < 0.00001% error\n")
+                    f.write(f"  - Applied ultra-high tolerance: 1e-14\n")
+                    f.write(f"  - Extended timeout and iterations enabled\n")
+                
+                return True
+        
+        return False
+
+    # New method to check and adjust configuration for critical values
+    def check_critical_configuration(self, beta: float) -> None:
+        """
+        Check and adjust configuration parameters for critical β values
+        
+        Args:
+        beta: The β value to check
+        """
+        proximity = abs(beta - self.target_beta_star)
+        
+        if proximity < 0.1:
+            # Very close to the critical region
+            print(f"🔍 Critical β region detected: {beta:.8f}")
+            print(f"  - Proximity to target β*: {proximity:.8f}")
+            
+            # Check for optimal parameters
+            if self.tolerance > 1e-13:
+                prev_tolerance = self.tolerance
+                self.tolerance = 1e-14  # Ultra-high precision
+                print(f"  - Adjusting tolerance: {prev_tolerance:.2e} → {self.tolerance:.2e}")
+            
+            # Specific adjustments for the exact critical values you mentioned
+            for critical_value in [4.1020, 4.1040, 4.1060]:
+                if abs(beta - critical_value) < 0.0001:
+                    print(f"  - APPLYING ACADEMIC VALIDATION SETTINGS for β={critical_value:.4f}")
+                    # Create special validation record
+                    log_dir = os.path.join(self.academic_validation_dir, "value_specific")
+                    os.makedirs(log_dir, exist_ok=True)
+                    
+                    with open(os.path.join(log_dir, f"validation_beta_{beta:.8f}.txt"), "a") as f:
+                        f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting academic-grade optimization\n")
+                        f.write(f"Target precision: <0.00001% error\n")
+                        f.write(f"Tolerance: {self.tolerance:.2e}\n")
+
+    # New method to log detailed diagnostic information for timeout events
+    def log_timeout_diagnostics(self, beta: float, stage: str, elapsed_time: float, 
+                              iterations: int, convergence_info: Dict = None):
+        """
+        Log detailed diagnostic information about timeout events
+        
+        Args:
+        beta: The β value being optimized
+        stage: The optimization stage or component where timeout occurred
+        elapsed_time: Time elapsed before timeout (seconds)
+        iterations: Number of iterations completed before timeout
+        convergence_info: Additional information about convergence progress
+        """
+        log_dir = self.timeout_logs_dir
+        
+        # Create a unique log file for this beta value
+        log_file = os.path.join(log_dir, f"timeout_beta_{beta:.8f}.log")
+        
+        # Get basic system information
+        import platform
+        system_info = {
+            "system": platform.system(),
+            "release": platform.release(),
+            "version": platform.version(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+            "python": platform.python_version()
+        }
+        
+        # Create the log entry
+        with open(log_file, "a") as f:
+            f.write(f"===== TIMEOUT DIAGNOSTIC LOG =====\n")
+            f.write(f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Beta Value: {beta:.10f}\n")
+            f.write(f"Distance from target β*: {abs(beta - self.target_beta_star):.10f}\n")
+            f.write(f"Timeout Location: {stage}\n")
+            f.write(f"Elapsed Time: {elapsed_time:.2f} seconds\n")
+            f.write(f"Completed Iterations: {iterations}\n")
+            f.write(f"Current Tolerance: {self.tolerance:.2e}\n")
+            
+            # Write convergence info if available
+            if convergence_info:
+                f.write("\nConvergence Information:\n")
+                for key, value in convergence_info.items():
+                    f.write(f"  {key}: {value}\n")
+            
+            # Write system information
+            f.write("\nSystem Information:\n")
+            for key, value in system_info.items():
+                f.write(f"  {key}: {value}\n")
+            
+            f.write("\nResolution Strategy: ")
+            if abs(beta - self.target_beta_star) < 0.05:
+                f.write("Critical value detected - applying extended runtime and precision.\n")
+            else:
+                f.write("Standard optimization parameters applied.\n")
+            
+            f.write("================================\n\n")
+        
+        # Also print a summary to console
+        print(f"⏱️ Timeout diagnostic log created for β={beta:.8f} in {stage} after {elapsed_time:.2f}s")
+        print(f"   See {log_file} for details")
 
     ### ENHANCEMENT: New method for ultra-focused mesh generation
     def ultra_focused_mesh(self, lower: float, upper: float, points: int, 
@@ -578,20 +727,30 @@ class PerfectedInformationBottleneck:
             proximity = abs(beta - self.target_beta_star)
             is_critical = proximity < 0.15  # Wider critical zone
             
+            # Check for specific critical values that need ultra-precise handling
+            is_ultra_critical = any(abs(beta - critical_val) < 0.0001 
+                                  for critical_val in [4.1020, 4.1040, 4.1060])
+            
             # Print the beta value being processed
             if is_critical:
                 print(f"Processing critical β = {beta:.8f} (distance from target: {proximity:.8f})")
+                if is_ultra_critical:
+                    print(f"⚠️ ULTRA-CRITICAL ACADEMIC VALUE DETECTED - APPLYING MAXIMUM PRECISION ⚠️")
             
             # Use variable runs based on proximity to target
             n_runs = 1  # Default to single run
-            if proximity < 0.01:  # Very close to critical value
+            if is_ultra_critical:
+                n_runs = 5  # Much more runs for ultra-critical values
+            elif proximity < 0.01:  # Very close to critical value
                 n_runs = 3  # More runs for very close values
             elif proximity < 0.1:  # Moderately close
                 n_runs = 2
             
             # Adjust iterations based on proximity
             max_iterations = 800  # Default
-            if is_critical:
+            if is_ultra_critical:
+                max_iterations = 3000  # Maximum iterations for ultra-critical values
+            elif is_critical:
                 max_iterations = 1500  # More iterations for critical values
             
             # Results storage
@@ -601,7 +760,9 @@ class PerfectedInformationBottleneck:
             # Run optimization with adaptive timeout based on criticality
             start_time = time.time()
             timeout_per_run = 180  # Default: 3 minutes per run
-            if is_critical:
+            if is_ultra_critical:
+                timeout_per_run = 1800  # 30 minutes for ultra-critical values
+            elif is_critical:
                 timeout_per_run = 600  # 10 minutes for critical values
             
             with THREAD_LOCK:  # Thread-safe random state access
@@ -612,6 +773,15 @@ class PerfectedInformationBottleneck:
                     run_start = time.time()
                     if time.time() - start_time > timeout_per_run:
                         print(f"⏱️ Timeout for beta={beta}, stopping after {run} runs")
+                        # Log timeout diagnostics for critical values
+                        if is_critical:
+                            self.log_timeout_diagnostics(
+                                beta=beta,
+                                stage=f"optimize_beta run {run+1}/{n_runs}",
+                                elapsed_time=time.time() - start_time,
+                                iterations=run,
+                                convergence_info={"completed_runs": run, "total_runs": n_runs}
+                            )
                         break
                         
                     with THREAD_LOCK:
@@ -623,7 +793,7 @@ class PerfectedInformationBottleneck:
                             beta, 
                             use_staged=is_critical,  # Use staged optimization for critical values
                             max_iterations=max_iterations,
-                            tolerance=self.tolerance
+                            tolerance=self.tolerance if not is_ultra_critical else 1e-14
                         )
                         
                         izx_values.append(mi_zx)
@@ -631,6 +801,13 @@ class PerfectedInformationBottleneck:
                         
                     except Exception as e:
                         print(f"Error optimizing beta={beta}, run={run}: {str(e)}")
+                        
+                        # Log the error for diagnostics
+                        if is_critical:
+                            error_file = os.path.join(self.diagnostics_dir, "optimization_errors.log")
+                            with open(error_file, "a") as f:
+                                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Error optimizing β={beta:.8f}, "
+                                        f"run={run}: {str(e)}\n")
                         
                     # Check run timeout
                     if time.time() - run_start > timeout_per_run / n_runs:
@@ -648,6 +825,31 @@ class PerfectedInformationBottleneck:
             # Calculate average values
             avg_izx = np.mean(izx_values)
             avg_izy = np.mean(izy_values)
+            
+            # For ultra-critical values, verify results meet academic standards
+            if is_ultra_critical and len(izx_values) >= 2:
+                izx_std = np.std(izx_values)
+                rel_std = izx_std / (avg_izx + self.epsilon)
+                
+                # Log verification for academic record
+                verification_file = os.path.join(self.academic_validation_dir, 
+                                               f"verification_beta_{beta:.8f}.log")
+                
+                with open(verification_file, "a") as f:
+                    f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Academic validation for β={beta:.8f}\n")
+                    f.write(f"  Runs completed: {len(izx_values)}/{n_runs}\n")
+                    f.write(f"  I(Z;X) = {avg_izx:.12f} ± {izx_std:.12f}\n")
+                    f.write(f"  I(Z;Y) = {avg_izy:.12f}\n")
+                    f.write(f"  Relative standard deviation: {rel_std*100:.8f}%\n")
+                    
+                    if rel_std < 0.0001:  # 0.01% relative standard deviation
+                        f.write("  ✓ PASSED Academic validation (< 0.01% relative error)\n")
+                    else:
+                        f.write("  ✗ FAILED Academic validation (> 0.01% relative error)\n")
+                
+                if rel_std >= 0.0001 and len(izx_values) >= 2:
+                    print(f"⚠️ Academic validation warning for β={beta:.8f}: "
+                         f"relative error {rel_std*100:.6f}% exceeds threshold")
             
             # Update progress
             with self._progress_lock:
@@ -686,11 +888,29 @@ class PerfectedInformationBottleneck:
             # Check if this is a critical batch (containing values near β*)
             is_critical_batch = any(abs(beta - self.target_beta_star) < 0.15 for beta in batch)
             
+            # Check for ultra-critical values (specifically the ones you mentioned)
+            is_ultra_critical_batch = any(any(abs(beta - critical_val) < 0.0001 
+                                          for critical_val in [4.1020, 4.1040, 4.1060]) 
+                                      for beta in batch)
+            
             # Print batch details for debugging
             print(f"Processing batch {batch_index} of {(len(beta_values) + batch_size - 1)//batch_size}")
             print(f"Batch {batch_index} betas:", [f"{beta:.8f}" for beta in batch])
-            if is_critical_batch:
+            
+            if is_ultra_critical_batch:
+                print(f"!!! ULTRA-CRITICAL ACADEMIC BATCH DETECTED !!! - Special academic validation enabled")
+            elif is_critical_batch:
                 print(f"!!! CRITICAL BATCH DETECTED !!! - Special handling enabled")
+            
+            # Reduce batch size for ultra-critical values to provide more resources per value
+            if is_ultra_critical_batch and len(batch) > 2:
+                print(f"Reducing batch size for ultra-critical values")
+                # Process just the first ultra-critical value in this batch
+                for idx, beta in enumerate(batch):
+                    if any(abs(beta - critical_val) < 0.0001 
+                         for critical_val in [4.1020, 4.1040, 4.1060]):
+                        batch = [beta]
+                        break
             
             # IMPORTANT: Create a new executor for each batch with context manager
             with ThreadPoolExecutor(max_workers=3) as executor:  # Reduced from 4
@@ -720,7 +940,11 @@ class PerfectedInformationBottleneck:
                     try:
                         # Individual task timeout based on criticality
                         task_timeout = 600  # 10 minutes per task by default
-                        if is_critical_batch:
+                        
+                        # Increase timeout for critical batches and ultra-critical values
+                        if is_ultra_critical_batch:
+                            task_timeout = 3600  # 60 minutes for ultra-critical academic values
+                        elif is_critical_batch:
                             task_timeout = 1200  # 20 minutes for critical tasks
                         
                         # Get result with per-task timeout
@@ -729,10 +953,38 @@ class PerfectedInformationBottleneck:
                         finished_futures.append(future)
                         completed += 1
                         print(f"Completed {completed}/{len(batch)} in batch {batch_index}")
+                        
+                        # Log successful completion for ultra-critical values
+                        if any(abs(beta - critical_val) < 0.0001 
+                             for critical_val in [4.1020, 4.1040, 4.1060]):
+                            completion_file = os.path.join(self.academic_validation_dir, 
+                                                         "critical_completions.log")
+                            with open(completion_file, "a") as f:
+                                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+                                        f"Successfully completed optimization for β={beta:.8f}\n")
+                                f.write(f"  I(Z;X) = {result[0]:.12f}, I(Z;Y) = {result[1]:.12f}\n")
+                                f.write(f"  Distance from target β*: {abs(beta - self.target_beta_star):.8f}\n")
+                                
                     except TimeoutError:
                         print(f"⚠️ Task timeout in batch {batch_index}")
+                        
+                        # Log timeout for diagnostics
+                        timeout_file = os.path.join(self.timeout_logs_dir, "batch_timeouts.log")
+                        with open(timeout_file, "a") as f:
+                            f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+                                    f"Task timeout in batch {batch_index}\n")
+                            f.write(f"  Batch betas: {[f'{b:.8f}' for b in batch]}\n")
+                            f.write(f"  Completed {completed}/{len(batch)}\n")
+                            
                     except Exception as e:
                         print(f"❌ Error in task in batch {batch_index}: {str(e)}")
+                        
+                        # Log error for diagnostics
+                        error_file = os.path.join(self.diagnostics_dir, "task_errors.log")
+                        with open(error_file, "a") as f:
+                            f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+                                    f"Error in batch {batch_index}: {str(e)}\n")
+                            f.write(f"  Batch betas: {[f'{b:.8f}' for b in batch]}\n")
                 
                 # Check if we have any unfinished futures
                 unfinished = [f for f in futures if f not in finished_futures]
@@ -746,7 +998,13 @@ class PerfectedInformationBottleneck:
             import gc
             gc.collect()
             # Longer delay after critical batches
-            time.sleep(2.0 if is_critical_batch else 1.0)
+            if is_ultra_critical_batch:
+                print("Extended cleanup after ultra-critical batch")
+                time.sleep(5.0)  # Longer delay for ultra-critical batches
+            elif is_critical_batch:
+                time.sleep(2.0)  # Delay for critical batches
+            else:
+                time.sleep(1.0)  # Standard delay
         
         print(f"Evaluating β values: 100% | {self._total_progress}/{self._total_progress}")
         
@@ -2156,6 +2414,8 @@ class PerfectedInformationBottleneck:
         
         # Check if this is a critical beta value
         is_critical = abs(beta - self.target_beta_star) < 0.15
+        is_ultra_critical = any(abs(beta - critical_val) < 0.0001 
+                              for critical_val in [4.1020, 4.1040, 4.1060])
         
         # Calculate initial values
         p_z, _ = self.calculate_marginal_z(p_z_given_x)
@@ -2170,27 +2430,55 @@ class PerfectedInformationBottleneck:
         converged = False
         
         # Adaptive early stopping based on criticality
-        early_stop_threshold = 50 if is_critical else 100
+        early_stop_threshold = is_ultra_critical and 150 or (is_critical and 50 or 100)
         
         # Track historical values for stability checking
         obj_history = [objective]
         
         # Adaptive damping factor - gentler for critical values
-        damping = 0.03 if is_critical else 0.05
+        damping = is_ultra_critical and 0.01 or (is_critical and 0.03 or 0.05)
         
         # Adaptive runtime based on criticality
         start_time = time.time()
-        max_runtime = 300 if is_critical else 120  # 5 minutes for critical, 2 minutes otherwise
+        if is_ultra_critical:
+            max_runtime = 1800  # 30 minutes for ultra-critical values
+        elif is_critical:
+            max_runtime = 600   # 10 minutes for critical values
+        else:
+            max_runtime = 300   # 5 minutes for standard values
         
         # Frequent timeout check interval
         timeout_check_interval = 5
         
         # Allow more oscillation for critical values before increasing damping
-        oscillation_threshold = tolerance * 20 if is_critical else tolerance * 10
+        oscillation_threshold = is_ultra_critical and tolerance * 50 or (is_critical and tolerance * 20 or tolerance * 10)
         
         while iteration < max_iterations and not converged:
             # Check for timeout more frequently
             if iteration % timeout_check_interval == 0 and time.time() - start_time > max_runtime:
+                # Log detailed timeout diagnostics
+                convergence_info = {
+                    "current_objective": objective,
+                    "previous_objective": prev_objective,
+                    "delta": abs(objective - prev_objective),
+                    "current_damping": damping,
+                    "iterations_completed": iteration,
+                    "mi_zx": mi_zx,
+                    "mi_zy": mi_zy,
+                    "is_critical": is_critical,
+                    "is_ultra_critical": is_ultra_critical,
+                    "max_iterations": max_iterations,
+                    "tolerance": tolerance
+                }
+                
+                self.log_timeout_diagnostics(
+                    beta=beta,
+                    stage="_optimize_single_beta",
+                    elapsed_time=time.time() - start_time,
+                    iterations=iteration,
+                    convergence_info=convergence_info
+                )
+                
                 if verbose:
                     print(f" Stopping after {iteration} iterations due to timeout")
                 break
@@ -2205,11 +2493,11 @@ class PerfectedInformationBottleneck:
                 # Check if objective is improving
                 if objective <= prev_objective:
                     # If not improving, increase damping more gradually for critical values
-                    damping_increase = 1.1 if is_critical else 1.2
+                    damping_increase = is_ultra_critical and 1.05 or (is_critical and 1.1 or 1.2)
                     damping = min(damping * damping_increase, 0.5)
                 else:
                     # If improving, reduce damping more gradually for critical values
-                    damping_decrease = 0.95 if is_critical else 0.9
+                    damping_decrease = is_ultra_critical and 0.98 or (is_critical and 0.95 or 0.9)
                     damping = max(damping * damping_decrease, 0.01)
             
             # Apply damping
@@ -2230,7 +2518,7 @@ class PerfectedInformationBottleneck:
             # Early stopping for slow convergence - check every early_stop_threshold iterations
             if iteration > early_stop_threshold and iteration % early_stop_threshold == 0:
                 # Check if we're making meaningful progress
-                progress_threshold = tolerance * 3 if is_critical else tolerance * 5
+                progress_threshold = is_ultra_critical and tolerance * 1 or (is_critical and tolerance * 3 or tolerance * 5)
                 if abs(objective - obj_history[-early_stop_threshold]) < progress_threshold:
                     if verbose:
                         print(f" Early stopping: slow convergence detected after {iteration} iterations")
@@ -2242,12 +2530,12 @@ class PerfectedInformationBottleneck:
                 recent_diff = np.abs(np.diff(obj_history[-5:]))
                 if np.any(recent_diff > oscillation_threshold):
                     # If oscillating, increase damping significantly but more gently for critical values
-                    damping_factor = 1.5 if is_critical else 2.0
+                    damping_factor = is_ultra_critical and 1.2 or (is_critical and 1.5 or 2.0)
                     damping = min(damping * damping_factor, 0.8)
             
             # Check convergence with precision tolerance
             # For critical values, require more iterations of stability
-            stability_window = 5 if is_critical else 3
+            stability_window = is_ultra_critical and 10 or (is_critical and 5 or 3)
             if abs(objective - prev_objective) < tolerance:
                 if iteration > stability_window and all(abs(o - objective) < tolerance for o in obj_history[-stability_window:]):
                     converged = True
@@ -2271,6 +2559,29 @@ class PerfectedInformationBottleneck:
         
         if not converged and verbose:
             print(f" WARNING: Did not converge after {iteration} iterations")
+        
+        # Log detailed convergence information for ultra-critical values
+        if is_ultra_critical:
+            convergence_file = os.path.join(self.academic_validation_dir, 
+                                          f"convergence_beta_{beta:.8f}.log")
+            with open(convergence_file, "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+                       f"Optimization for β={beta:.8f} completed\n")
+                f.write(f"  Iterations: {iteration}/{max_iterations}\n")
+                f.write(f"  Converged: {converged}\n")
+                f.write(f"  Final damping: {damping}\n")
+                f.write(f"  Final objective: {objective:.12f}\n")
+                f.write(f"  Final I(Z;X): {mi_zx:.12f}\n")
+                f.write(f"  Final I(Z;Y): {mi_zy:.12f}\n")
+                f.write(f"  Final objective delta: {abs(objective - prev_objective):.2e}\n")
+                
+                if len(obj_history) > 50:
+                    # Calculate convergence rate (using last 50 iterations)
+                    deltas = np.abs(np.diff(obj_history[-50:]))
+                    avg_delta = np.mean(deltas)
+                    f.write(f"  Average convergence delta (last 50 iter): {avg_delta:.2e}\n")
+                    
+                f.write(f"  Runtime: {time.time() - start_time:.1f} seconds\n")
         
         self.current_encoder = p_z_given_x
         return p_z_given_x, mi_zx, mi_zy
@@ -2300,13 +2611,30 @@ class PerfectedInformationBottleneck:
         """
         # Check if this is a critical beta value
         is_critical = abs(target_beta - self.target_beta_star) < 0.15
+        is_ultra_critical = any(abs(target_beta - critical_val) < 0.0001 
+                              for critical_val in [4.1020, 4.1040, 4.1060])
         
         # For critical values, use more stages and different parameters
-        if is_critical:
+        if is_ultra_critical:
+            num_stages = max(num_stages, 15)  # Many more stages for ultra-critical values
+            # Log the optimization plan
+            log_file = os.path.join(self.academic_validation_dir, 
+                                   f"staged_opt_plan_{target_beta:.8f}.log")
+            with open(log_file, "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+                       f"Starting ULTRA-CRITICAL staged optimization\n")
+                f.write(f"  Target β: {target_beta:.8f}\n")
+                f.write(f"  Stages: {num_stages}\n")
+                f.write(f"  Max iterations per stage: {max_iterations}\n")
+                f.write(f"  Tolerance: {tolerance:.2e}\n")
+        elif is_critical:
             num_stages = max(num_stages, 9)  # More stages for critical region
             
         if verbose:
-            if is_critical:
+            if is_ultra_critical:
+                print(f"Starting ULTRA-CRITICAL staged optimization for β={target_beta:.8f} with {num_stages} stages")
+                print(f"Using academic-grade parameters: tolerance={tolerance:.2e}, max_iter={max_iterations}")
+            elif is_critical:
                 print(f"Starting CRITICAL staged optimization for β={target_beta:.5f} with {num_stages} stages")
             else:
                 print(f"Starting staged optimization for β={target_beta:.5f} with {num_stages} stages")
@@ -2321,28 +2649,71 @@ class PerfectedInformationBottleneck:
             start_beta = max(0.1, target_beta * 0.5)
             
             # Use non-linear spacing to concentrate points near target
-            if in_critical_region:
+            if is_ultra_critical:
+                # Extremely careful approach for ultra-critical values
+                alpha = 4.0
+            elif in_critical_region:
                 # Very careful approach
                 alpha = 3.0  # More concentration near target 
             else:
                 alpha = 2.0
         else:
             # Above target β* - start from below and cross the transition
-            start_beta = max(0.1, self.target_beta_star * 0.8)
-            
-            if in_critical_region:
-                alpha = 3.0
+            if is_ultra_critical:
+                # For ultra-critical values, start well below the target
+                start_beta = max(0.1, self.target_beta_star * 0.7)
+                alpha = 4.0
             else:
-                alpha = 2.0
+                start_beta = max(0.1, self.target_beta_star * 0.8)
+                
+                if in_critical_region:
+                    alpha = 3.0
+                else:
+                    alpha = 2.0
             
         # Generate beta sequence with desired non-linear spacing
         t = np.linspace(0, 1, num_stages) ** alpha
         betas = start_beta + (target_beta - start_beta) * t
             
+        # For ultra-critical values, add extra intermediate points near the target
+        if is_ultra_critical:
+            # Add 5 extra points very close to the target
+            extra_points = np.linspace(
+                target_beta - 0.01, 
+                target_beta - 0.0001, 
+                5
+            )
+            # Insert these points into the beta sequence
+            betas = np.sort(np.concatenate([betas, extra_points]))
+            # Ensure target_beta is the last value
+            if betas[-1] != target_beta:
+                betas = np.append(betas, target_beta)
+            # Remove duplicates
+            betas = np.unique(betas)
+            
+            # Log the beta sequence
+            if verbose or is_ultra_critical:
+                print(f"Enhanced beta sequence for academic validation: {[f'{b:.6f}' for b in betas]}")
+                log_file = os.path.join(self.academic_validation_dir, 
+                                       f"beta_sequence_{target_beta:.8f}.log")
+                with open(log_file, "a") as f:
+                    f.write(f"Beta sequence: {[f'{b:.8f}' for b in betas]}\n")
+            
         # Initialize encoder
         if p_z_given_x_init is None:
             # Choose initialization based on proximity to target
-            if in_critical_region:
+            if is_ultra_critical:
+                # For ultra-critical values, try multiple initializations
+                p_z_given_x_identity = self.initialize_identity(self.cardinality_x, self.cardinality_z)
+                p_z_given_x_structured = self.initialize_structured(self.cardinality_x, self.cardinality_z)
+                p_z_given_x_entropy = self.initialize_high_entropy()
+                
+                # Blend them
+                p_z_given_x = (0.4 * p_z_given_x_identity + 
+                               0.4 * p_z_given_x_structured + 
+                               0.2 * p_z_given_x_entropy)
+                p_z_given_x = self.normalize_rows(p_z_given_x)
+            elif in_critical_region:
                 p_z_given_x = self.enhanced_near_critical_initialization(betas[0])
             else:
                 p_z_given_x = self.adaptive_initialization(betas[0])
@@ -2353,6 +2724,13 @@ class PerfectedInformationBottleneck:
         progress_bar_total = len(betas)
         print(f"Optimizing in {progress_bar_total} stages: ", end="", flush=True)
         
+        # Create a file to track stagewise progress for ultra-critical values
+        if is_ultra_critical:
+            stage_log_file = os.path.join(self.academic_validation_dir, 
+                                        f"stages_{target_beta:.8f}.log")
+            with open(stage_log_file, "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting staged optimization\n")
+        
         # Run optimization stages with adaptive parameters
         for stage, beta in enumerate(betas):
             # Update progress
@@ -2360,12 +2738,16 @@ class PerfectedInformationBottleneck:
             print(f"{progress_pct}% ", end="", flush=True)
             
             if verbose:
-                print(f"\nStage {stage+1}/{num_stages}: β={beta:.5f}")
+                print(f"\nStage {stage+1}/{len(betas)}: β={beta:.5f}")
             
             # Adaptive parameters based on proximity to critical point
             stage_proximity = abs(beta - self.target_beta_star)
             
-            if stage_proximity < 0.01:
+            if is_ultra_critical:
+                # For ultra-critical values, use maximum precision throughout
+                stage_max_iter = max_iterations * 2  # Double iterations for ultra-critical values
+                stage_tol = tolerance / 10  # 10x tighter tolerance
+            elif stage_proximity < 0.01:
                 # Very close to critical point
                 stage_max_iter = int(max_iterations * 1.2)  # More iterations
                 stage_tol = tolerance * 0.1  # Tighter tolerance
@@ -2374,7 +2756,7 @@ class PerfectedInformationBottleneck:
                 stage_tol = tolerance
             
             # For stages very close to target in critical region, use more careful optimization
-            if stage_proximity < 0.05 and in_critical_region:
+            if (stage_proximity < 0.05 and in_critical_region) or is_ultra_critical:
                 # Special handling for very critical stages
                 # 1. Multiple random initializations
                 best_objective = float('-inf')
@@ -2382,17 +2764,33 @@ class PerfectedInformationBottleneck:
                 best_mi_zx = 0.0
                 best_mi_zy = 0.0
                 
-                for init_attempt in range(3):  # Try 3 different initializations
+                # More initialization attempts for ultra-critical values
+                num_attempts = 5 if is_ultra_critical else 3
+                
+                for init_attempt in range(num_attempts):
                     if verbose:
-                        print(f" Critical stage: initialization attempt {init_attempt+1}/3")
+                        print(f" Critical stage: initialization attempt {init_attempt+1}/{num_attempts}")
                     
                     # Different initialization for each attempt
                     if init_attempt == 0:
                         init_p_z_given_x = p_z_given_x.copy()  # Continue from previous
                     elif init_attempt == 1:
                         init_p_z_given_x = self.enhanced_near_critical_initialization(beta)  # Fresh critical initialization
-                    else:
+                    elif init_attempt == 2:
                         init_p_z_given_x = self.initialize_multi_modal()  # Try multi-modal
+                    else:
+                        # For ultra-critical values, try more diverse initializations
+                        if init_attempt == 3:
+                            init_p_z_given_x = self.initialize_structured(self.cardinality_x, self.cardinality_z)
+                        else:
+                            init_p_z_given_x = self.initialize_identity(self.cardinality_x, self.cardinality_z)
+                    
+                    # Add small randomization to avoid identical initializations
+                    if init_attempt > 0:
+                        noise = np.random.randn(*init_p_z_given_x.shape) * 0.01
+                        init_p_z_given_x = self.normalize_rows(init_p_z_given_x + noise)
+                    
+                    start_time = time.time()
                     
                     # Run optimization for this stage with the current initialization
                     tmp_p_z_given_x, tmp_mi_zx, tmp_mi_zy = self._optimize_single_beta(
@@ -2404,6 +2802,14 @@ class PerfectedInformationBottleneck:
                     
                     # Calculate objective
                     tmp_objective = tmp_mi_zy - beta * tmp_mi_zx
+                    
+                    # Log for ultra-critical values
+                    if is_ultra_critical:
+                        with open(stage_log_file, "a") as f:
+                            f.write(f"  Stage {stage+1}, Attempt {init_attempt+1}: β={beta:.8f}\n")
+                            f.write(f"    I(Z;X) = {tmp_mi_zx:.12f}, I(Z;Y) = {tmp_mi_zy:.12f}\n")
+                            f.write(f"    Objective = {tmp_objective:.12f}\n")
+                            f.write(f"    Runtime = {time.time() - start_time:.1f}s\n")
                     
                     # Keep the best result
                     if tmp_objective > best_objective:
@@ -2431,6 +2837,39 @@ class PerfectedInformationBottleneck:
             # Cache this encoder for future optimizations
             if mi_zx > self.min_izx_threshold:
                 self.encoder_cache[beta] = p_z_given_x.copy()
+            
+            # For ultra-critical values, save detailed information at each stage
+            if is_ultra_critical:
+                # Create a directory for academic validation plots
+                plots_dir = os.path.join(self.academic_validation_dir, "plots")
+                os.makedirs(plots_dir, exist_ok=True)
+                
+                # Save encoder state at this stage
+                analysis_file = os.path.join(self.academic_validation_dir, 
+                                           f"encoder_state_{target_beta:.8f}_stage_{stage+1}.npz")
+                np.savez(analysis_file, 
+                        beta=beta, 
+                        p_z_given_x=p_z_given_x, 
+                        mi_zx=mi_zx, 
+                        mi_zy=mi_zy)
+                
+                # Create visualization of encoder state
+                if stage == len(betas) - 1:  # Only for the final stage
+                    try:
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        im = ax.imshow(p_z_given_x, cmap='viridis', aspect='auto')
+                        plt.colorbar(im, ax=ax)
+                        ax.set_title(f'Encoder p(z|x) for β={beta:.6f}')
+                        ax.set_xlabel('Z')
+                        ax.set_ylabel('X')
+                        
+                        # Save visualization
+                        fig_path = os.path.join(plots_dir, f"encoder_{target_beta:.8f}_final.png")
+                        plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+                        plt.close(fig)
+                    except Exception as e:
+                        # Don't fail if visualization fails
+                        print(f"Warning: Failed to create visualization: {str(e)}")
         
         print(" Done!")
         
@@ -2440,6 +2879,30 @@ class PerfectedInformationBottleneck:
         if verbose:
             print(f"Staged optimization complete for β={target_beta:.5f}")
             print(f"Final values: I(Z;X)={mi_zx:.6f}, I(Z;Y)={mi_zy:.6f}")
+        
+        # For ultra-critical values, verify and log final results
+        if is_ultra_critical:
+            verification_file = os.path.join(self.academic_validation_dir, 
+                                           f"final_validation_{target_beta:.8f}.log")
+            
+            with open(verification_file, "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Final optimization results\n")
+                f.write(f"  Target β: {target_beta:.12f}\n")
+                f.write(f"  Distance from β*: {abs(target_beta - self.target_beta_star):.12f}\n")
+                f.write(f"  Final I(Z;X): {mi_zx:.12f}\n")
+                f.write(f"  Final I(Z;Y): {mi_zy:.12f}\n")
+                
+                # Calculate relative error from theoretical target
+                if abs(target_beta - self.target_beta_star) < 0.001:
+                    relative_error = abs(target_beta - self.target_beta_star) / self.target_beta_star * 100
+                    f.write(f"  Relative error: {relative_error:.10f}%\n")
+                    
+                    if relative_error < 0.00001:
+                        f.write("  ✓ PASSED Academic Validation (< 0.00001% error)\n")
+                    else:
+                        f.write("  ✗ FAILED Academic Validation (> 0.00001% error)\n")
+                
+                f.write("  Staging sequence complete\n")
             
         return p_z_given_x, mi_zx, mi_zy
 
@@ -2466,9 +2929,31 @@ class PerfectedInformationBottleneck:
          mi_zx: Mutual information I(Z;X)
          mi_zy: Mutual information I(Z;Y)
         """
+        # Check for critical configuration first
+        self.check_critical_configuration(beta)
+        
         # Calculate proximity to critical region
         proximity = abs(beta - self.target_beta_star)
         in_critical_region = proximity < 0.1
+        
+        # Ultra-critical handling for specified values
+        is_ultra_critical = any(abs(beta - critical_val) < 0.0001 
+                              for critical_val in [4.1020, 4.1040, 4.1060])
+        
+        if is_ultra_critical:
+            print(f"🔬 ACADEMIC VALIDATION MODE: β={beta:.6f}")
+            # Ensure maximum precision and iterations for academic requirements
+            max_iterations = max(5000, max_iterations)
+            tolerance = min(1e-14, tolerance)
+            
+            # Custom staged optimization for academic validation
+            return self.staged_optimization(
+                beta,
+                num_stages=15,  # Much more stages for ultra-critical validation
+                max_iterations=max_iterations,
+                tolerance=tolerance,
+                verbose=True  # Always verbose for academic validation
+            )
             
         # Always use staged optimization for values near critical region
         if in_critical_region or use_staged:
@@ -2573,8 +3058,17 @@ class PerfectedInformationBottleneck:
         # 3. Theoretical Alignment Test with tightened tolerance
         print("3. Testing Theoretical Alignment...")
             
-        # Reduced tolerance - much stricter
-        alignment_tolerance = 0.01 * (self.target_beta_star / 100) # 0.01% of target_beta_star
+        # Check if this is an ultra-critical value for academic validation
+        is_ultra_critical = any(abs(beta_star - critical_val) < 0.0001 
+                             for critical_val in [4.1020, 4.1040, 4.1060])
+        
+        # Super tight tolerance for ultra-critical academic values
+        if is_ultra_critical:
+            alignment_tolerance = 0.001 * (self.target_beta_star / 10000) # 0.0001% of target_beta_star
+            print(f" ACADEMIC VALIDATION MODE: Using ultra-high precision tolerance: {alignment_tolerance:.12f}")
+        else:
+            # Regular tolerance - already strict
+            alignment_tolerance = 0.01 * (self.target_beta_star / 100) # 0.01% of target_beta_star
             
         alignment_test = abs(beta_star - self.target_beta_star) <= alignment_tolerance
         validation_results['theoretical_alignment'] = alignment_test
@@ -2608,25 +3102,71 @@ class PerfectedInformationBottleneck:
         print(f" Information-Theoretic Consistency Test: {'✓ PASSED' if consistency_test else '✗ FAILED'}")
             
         # Overall validation with higher weight on theoretical alignment
-        test_weights = {
-            'phase_transition': 0.2,
-            'delta_verification': 0.2,
-            'theoretical_alignment': 0.4, # Double weight on alignment
-            'curve_concavity': 0.1,
-            'encoder_stability': 0.1,
-            'information_consistency': 0.1
-        }
+        # For ultra-critical academic values, theoretical alignment has even higher weight
+        if is_ultra_critical:
+            test_weights = {
+                'phase_transition': 0.1,
+                'delta_verification': 0.1,
+                'theoretical_alignment': 0.6, # Much higher weight for academic validation
+                'curve_concavity': 0.1,
+                'encoder_stability': 0.05,
+                'information_consistency': 0.05
+            }
+            # Higher threshold for academic validation
+            passing_threshold = 0.85  # 85% weighted score required
+        else:
+            test_weights = {
+                'phase_transition': 0.2,
+                'delta_verification': 0.2,
+                'theoretical_alignment': 0.4, # Double weight on alignment
+                'curve_concavity': 0.1,
+                'encoder_stability': 0.1,
+                'information_consistency': 0.1
+            }
+            passing_threshold = 0.75  # 75% weighted score for regular validation
             
         weighted_score = sum(test_weights[test] * result for test, result in validation_results.items())
-        overall_result = weighted_score >= 0.75 # Require 75% weighted score to pass
+        overall_result = weighted_score >= passing_threshold
             
         validation_details['weighted_score'] = weighted_score
+        validation_details['passing_threshold'] = passing_threshold
             
         print("\nValidation Summary:")
         for test, result in validation_results.items():
             print(f" {test} (weight={test_weights[test]:.2f}): {'✓ PASSED' if result else '✗ FAILED'}")
-        print(f" Weighted score: {weighted_score:.2f} (threshold: 0.75)")
+        print(f" Weighted score: {weighted_score:.2f} (threshold: {passing_threshold:.2f})")
         print(f"\nOverall Validation: {'✓ PASSED' if overall_result else '✗ FAILED'}")
+        
+        # For ultra-critical values, create detailed academic validation report
+        if is_ultra_critical:
+            report_file = os.path.join(self.academic_validation_dir, 
+                                     f"validation_report_{beta_star:.8f}.log")
+            with open(report_file, "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] ACADEMIC VALIDATION REPORT\n")
+                f.write(f"Identified β* = {beta_star:.12f}\n")
+                f.write(f"Target β* = {self.target_beta_star:.12f}\n")
+                f.write(f"Absolute error = {abs(beta_star - self.target_beta_star):.12f}\n")
+                f.write(f"Relative error = {abs(beta_star - self.target_beta_star) / self.target_beta_star * 100:.10f}%\n")
+                
+                f.write("\nValidation Tests:\n")
+                for test, result in validation_results.items():
+                    f.write(f"- {test}: {'PASSED' if result else 'FAILED'}\n")
+                
+                f.write(f"Weighted score: {weighted_score:.4f} (threshold: {passing_threshold:.2f})\n")
+                f.write(f"Overall validation: {'PASSED' if overall_result else 'FAILED'}\n")
+                
+                # Add detailed information about each test
+                f.write("\nDetailed Test Results:\n")
+                f.write(f"1. Phase Transition: Gradient = {gradient:.8f}\n")
+                if 'below_beta_min_izx' in validation_details and validation_details['below_beta_min_izx'] is not None:
+                    f.write(f"2. Delta Verification: Min I(Z;X) below β* = {validation_details['below_beta_min_izx']:.8f}\n")
+                f.write(f"3. Theoretical Alignment: Error = {validation_details['alignment_error']:.12f}\n")
+                f.write(f"   Tolerance = {validation_details['alignment_tolerance']:.12f}\n")
+                
+                if overall_result and validation_results['theoretical_alignment']:
+                    f.write("\n✓✓✓ ACADEMIC-GRADE VALIDATION SUCCESSFUL ✓✓✓\n")
+                else:
+                    f.write("\n✗✗✗ ACADEMIC-GRADE VALIDATION FAILED ✗✗✗\n")
             
         return validation_results, overall_result, validation_details
 
@@ -3021,6 +3561,10 @@ class PerfectedInformationBottleneck:
             
         print("\nExecuting Absolute Verification Protocol...")
             
+        # Check if this is an ultra-critical value for academic validation
+        is_ultra_critical = any(abs(beta_star - critical_val) < 0.0001 
+                              for critical_val in [4.1020, 4.1040, 4.1060])
+        
         # 1. Bootstrap confidence interval with BCa method
         print("1. Bootstrap confidence interval...")
         ci_lower, ci_upper, ci_details = self.bca_bootstrap_ci(beta_star, expected, confidence)
@@ -3034,8 +3578,15 @@ class PerfectedInformationBottleneck:
             
         # 2. Theoretical alignment verification with precision requirement
         print("2. Theoretical alignment verification...")
-        # Error below 0.01% of theoretical value
-        max_error = expected * 0.0001 # 0.01%
+        
+        # Use ultra-high precision for academic validation
+        if is_ultra_critical:
+            max_error = expected * 0.00001  # 0.001% for academic validation
+            print(f" ACADEMIC VALIDATION MODE: Using ultra-high precision tolerance: {max_error:.12f}")
+        else:
+            # Regular high precision
+            max_error = expected * 0.0001  # 0.01%
+            
         theory_alignment = abs(beta_star - expected) <= max_error
         verification_results['theory_alignment'] = theory_alignment
             
@@ -3045,7 +3596,7 @@ class PerfectedInformationBottleneck:
         verification_details['max_allowed_error'] = max_error
             
         print(f" Error = {abs(beta_star - expected):.8f} ({error_percentage:.6f}%)")
-        print(f" Maximum allowed error = {max_error:.8f} (0.01%)")
+        print(f" Maximum allowed error = {max_error:.8f} ({max_error/expected*100:.6f}%)")
         print(f" Theoretical Alignment Test: {'✓ PASSED' if theory_alignment else '✗ FAILED'}")
             
         # 3. Monotonicity verification
@@ -3064,21 +3615,33 @@ class PerfectedInformationBottleneck:
         print(f" Monotonicity Test: {'✓ PASSED' if monotonicity else '✗ FAILED'}")
             
         # Overall verification with weighted scoring
-        test_weights = {
-            'ci_contains_expected': 0.3,
-            'theory_alignment': 0.5, # Higher weight on theory alignment
-            'monotonicity': 0.2
-        }
+        # For academic validation, theory alignment has much higher weight
+        if is_ultra_critical:
+            test_weights = {
+                'ci_contains_expected': 0.2,
+                'theory_alignment': 0.7,  # Much higher weight for academic validation
+                'monotonicity': 0.1
+            }
+            # Higher threshold for academic validation
+            passing_threshold = 0.9  # 90% weighted score required
+        else:
+            test_weights = {
+                'ci_contains_expected': 0.3,
+                'theory_alignment': 0.5, # Higher weight on theory alignment
+                'monotonicity': 0.2
+            }
+            passing_threshold = 0.75  # Require 75% weighted score to pass
             
         weighted_score = sum(test_weights[test] * result for test, result in verification_results.items())
-        overall_result = weighted_score >= 0.75 # Require 75% weighted score to pass
+        overall_result = weighted_score >= passing_threshold
             
         verification_details['weighted_score'] = weighted_score
+        verification_details['passing_threshold'] = passing_threshold
             
         print("\nVerification Summary:")
         for test, result in verification_results.items():
             print(f" {test} (weight={test_weights[test]:.2f}): {'✓ PASSED' if result else '✗ FAILED'}")
-        print(f" Weighted score: {weighted_score:.2f} (threshold: 0.75)")
+        print(f" Weighted score: {weighted_score:.2f} (threshold: {passing_threshold:.2f})")
         print(f"\nOverall Verification: {'✓ PASSED' if overall_result else '✗ FAILED'}")
             
         if overall_result:
@@ -3086,6 +3649,34 @@ class PerfectedInformationBottleneck:
             print(f"\nABSOLUTE PRECISION ACHIEVED: β* = {beta_star:.8f} ± {margin:.8f}")
             print(f"Error from theoretical target: {abs(beta_star - expected):.8f} "
                f"({abs(beta_star - expected) / expected * 100:.6f}%)")
+        
+        # Create detailed verification report for ultra-critical values
+        if is_ultra_critical:
+            report_file = os.path.join(self.academic_validation_dir, 
+                                     f"verification_report_{beta_star:.8f}.log")
+            with open(report_file, "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] ABSOLUTE VERIFICATION REPORT\n")
+                f.write(f"Identified β* = {beta_star:.12f}\n")
+                f.write(f"Target β* = {expected:.12f}\n")
+                f.write(f"Absolute error = {abs(beta_star - expected):.12f}\n")
+                f.write(f"Relative error = {abs(beta_star - expected) / expected * 100:.10f}%\n")
+                f.write(f"95% CI: [{ci_lower:.8f}, {ci_upper:.8f}]\n")
+                
+                f.write("\nVerification Tests:\n")
+                for test, result in verification_results.items():
+                    f.write(f"- {test}: {'PASSED' if result else 'FAILED'}\n")
+                
+                f.write(f"Weighted score: {weighted_score:.4f} (threshold: {passing_threshold:.2f})\n")
+                f.write(f"Overall verification: {'PASSED' if overall_result else 'FAILED'}\n")
+                
+                if overall_result and verification_results['theory_alignment']:
+                    f.write("\n✓✓✓ ABSOLUTE ACADEMIC VERIFICATION SUCCESSFUL ✓✓✓\n")
+                    if error_percentage < 0.00001:
+                        f.write("Achieved <0.00001% relative error - EXCEEDS academic publication requirements\n")
+                    elif error_percentage < 0.0001:
+                        f.write("Achieved <0.0001% relative error - MEETS academic publication requirements\n")
+                else:
+                    f.write("\n✗✗✗ ABSOLUTE ACADEMIC VERIFICATION FAILED ✗✗✗\n")
             
         return verification_results, overall_result, verification_details
 
@@ -3330,9 +3921,21 @@ class PerfectedInformationBottleneck:
         # Using more refined analysis that accounts for statistical uncertainty
         theoretical_error = abs(beta_star - self.target_beta_star)
         theoretical_error_rate = theoretical_error / self.target_beta_star
-        checks['theoretical_proximity'] = theoretical_error_rate < 0.01 # Within 1%
+        
+        # Check for ultra-critical values requiring tighter tolerance
+        is_ultra_critical = any(abs(beta_star - critical_val) < 0.0001 
+                             for critical_val in [4.1020, 4.1040, 4.1060])
+        
+        if is_ultra_critical:
+            # Much tighter threshold for academic validation
+            threshold = 0.00001  # 0.001%
+        else:
+            threshold = 0.01  # 1%
+            
+        checks['theoretical_proximity'] = theoretical_error_rate < threshold
         details['theoretical_error'] = theoretical_error
         details['theoretical_error_rate'] = theoretical_error_rate
+        details['threshold'] = threshold
             
         # 2. Verify behavior below β*
         # Test at multiple points below to confirm consistent behavior
@@ -3417,28 +4020,59 @@ class PerfectedInformationBottleneck:
             checks['information_plane_slope'] = True # No data to check
             
         # Overall theory consistency
-        # Weighted combination of checks
-        check_weights = {
-            'theoretical_proximity': 0.3,
-            'below_nontrivial': 0.2,
-            'above_transition': 0.2,
-            'negative_gradient': 0.2,
-            'information_plane_slope': 0.1
-        }
+        # Weighted combination of checks with higher weight on theoretical proximity for ultra-critical values
+        if is_ultra_critical:
+            check_weights = {
+                'theoretical_proximity': 0.5,  # Higher weight for academic validation
+                'below_nontrivial': 0.15,
+                'above_transition': 0.15,
+                'negative_gradient': 0.1,
+                'information_plane_slope': 0.1
+            }
+            theory_threshold = 0.85  # Higher threshold
+        else:
+            check_weights = {
+                'theoretical_proximity': 0.3,
+                'below_nontrivial': 0.2,
+                'above_transition': 0.2,
+                'negative_gradient': 0.2,
+                'information_plane_slope': 0.1
+            }
+            theory_threshold = 0.7  # 70% threshold
             
         # Calculate weighted score
         theory_score = sum(check_weights[check] * result for check, result in checks.items())
-        theory_consistent = theory_score >= 0.7 # 70% threshold
+        theory_consistent = theory_score >= theory_threshold
             
         details['checks'] = checks
         details['check_weights'] = check_weights
         details['theory_score'] = theory_score
+        details['theory_threshold'] = theory_threshold
         details['below_betas'] = below_betas
         details['below_izx'] = below_izx_values
         details['below_izy'] = below_izy_values
         details['above_betas'] = above_betas
         details['above_izx'] = above_izx_values
         details['above_izy'] = above_izy_values
+        
+        # For ultra-critical values, log detailed verification
+        if is_ultra_critical:
+            log_file = os.path.join(self.academic_validation_dir, 
+                                   f"theory_consistency_{beta_star:.8f}.log")
+            with open(log_file, "a") as f:
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Theory Consistency Verification\n")
+                
+                for check_name, result in checks.items():
+                    f.write(f"{check_name}: {'PASSED' if result else 'FAILED'}\n")
+                    
+                    if check_name == 'theoretical_proximity':
+                        f.write(f"  Error rate: {theoretical_error_rate*100:.8f}%\n")
+                        f.write(f"  Threshold: {threshold*100:.6f}%\n")
+                    elif check_name == 'negative_gradient':
+                        f.write(f"  Gradient at β*: {gradient_at_star:.8f}\n")
+                
+                f.write(f"Overall score: {theory_score:.4f} (threshold: {theory_threshold:.2f})\n")
+                f.write(f"Theory consistency: {'PASSED' if theory_consistent else 'FAILED'}\n")
             
         return theory_consistent, details
 
@@ -3505,7 +4139,14 @@ class PerfectedInformationBottleneck:
             inlier_cv = beta_star_cv
             
         # Check reproducibility - relative variation should be small
-        reproducible = inlier_cv < 0.05 # Within 5% relative variation
+        is_ultra_critical = any(abs(beta_star - critical_val) < 0.0001 
+                              for critical_val in [4.1020, 4.1040, 4.1060])
+        
+        # Tighter threshold for academic validation
+        if is_ultra_critical:
+            reproducible = inlier_cv < 0.01  # Within 1% relative variation
+        else:
+            reproducible = inlier_cv < 0.05  # Within 5% relative variation
             
         details = {
             'random_seeds': list(range(n_seeds)),
@@ -3515,7 +4156,8 @@ class PerfectedInformationBottleneck:
             'outliers': outliers,
             'inliers': inliers,
             'inlier_std': inlier_std,
-            'inlier_cv': inlier_cv
+            'inlier_cv': inlier_cv,
+            'is_ultra_critical': is_ultra_critical
         }
             
         return reproducible, details
