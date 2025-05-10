@@ -10,26 +10,18 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 import numpy as np
-from typing import Tuple, List, Dict, Union, Optional, Callable, Any
+from typing import Tuple, List, Dict, Optional
 import warnings
 from scipy.special import logsumexp
 from scipy.ndimage import gaussian_filter1d
-from scipy.interpolate import CubicSpline, UnivariateSpline, LSQUnivariateSpline
-from scipy.signal import find_peaks, savgol_filter
+from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import os
-import scipy.stats as stats
-import scipy.signal as signal
 import multiprocessing
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import threading
 import time
 
-### ENHANCEMENT: Added new imports for statistical analysis and high precision
-from sklearn.linear_model import LinearRegression, HuberRegressor
-from scipy.optimize import curve_fit, minimize
-from scipy.stats import bootstrap
 from sklearn.isotonic import IsotonicRegression
 
 # BUGFIX: Control parallelism in scientific libraries
