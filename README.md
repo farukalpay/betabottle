@@ -12,7 +12,7 @@ This repository contains code and documentation accompanying the manuscript:
 
 **DOI V1:** [10.22541/au.174664105.57850297/v1](https://doi.org/10.22541/au.174664105.57850297/v1)
 
-**DOI V2:** [10.22541/au.174664105.57850297/v1](https://doi.org/10.22541/au.174664105.57850297/v2)
+**DOI V2:** [10.5281/zenodo.15384382](https://doi.org/10.5281/zenodo.15384382)
 
 **Paper V1:** `Code_v1/paper/enhanced_ib_framework.pdf` (contained within version-specific directories)
 
