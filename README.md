@@ -8,7 +8,7 @@ This repository contains code and documentation accompanying the manuscript:
 
 **Title:** β-Optimization in the Information Bottleneck Framework: A Theoretical Analysis
 
-**Date:** May 7, 2025
+**Date:** May 7, 2025 - May 11, 2025
 
 **DOI V1:** [10.22541/au.174664105.57850297/v1](https://doi.org/10.22541/au.174664105.57850297/v1)
 
