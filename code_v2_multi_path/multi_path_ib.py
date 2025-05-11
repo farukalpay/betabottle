@@ -1,5 +1,7 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# Author: Faruk Alpay
+# ORCID: 0009-0009-2207-6528
+# Publication: https://doi.org/10.22541/au.174664105.57850297/v1
+
 """
 Complete Information Bottleneck (IB) Framework with Multi-Path Incremental-β Extension
 
