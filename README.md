@@ -92,6 +92,7 @@ Code_v1/
 ├── paper/
 │   └── enhanced_ib_framework.pdf # Formal manuscript (relevant to Code_v1 context)
 ├── validate_beta_star.py       # Core β* validation script for Code_v1
+├── requirements.txt
 ```
 
 ### ✨ Significance of Results (Code_v1)
@@ -123,6 +124,7 @@ This second-stage implementation introduces the **Multi-Path Incremental-$\beta$
 ```
 code_v2_Multi_Path/
 ├── multi_path_ib.py            # Core multi-path IB framework
+├── requirements.txt
 ├── paper/
 │   └── enhanced_ib_framework.pdf # Associated paper (reflecting Code_v2 advancements)
 ├── ib_plots/                   # Auto-generated plots from Code_v2
