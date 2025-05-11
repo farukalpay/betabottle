@@ -16,7 +16,7 @@ This repository contains code and documentation accompanying the manuscript:
 
 **Paper V1:** `Code_v1/paper/enhanced_ib_framework.pdf` (contained within version-specific directories)
 
-**Paper V2:** `Code_v2_Multi_Path/paper/enhanced_ib_framework.pdf` (contained within version-specific directories)
+**Paper V2:** `code_v2_Multi_Path/paper/enhanced_ib_framework.pdf` (contained within version-specific directories)
 
 The research focuses on the rigorous determination and practical application of the critical parameter $\beta$ in the Information Bottleneck (IB) framework. This repository documents two major stages of the project: an initial validation of the critical phase transition point ($\beta^*$) and an enhanced multi-path optimization strategy.
 
@@ -105,7 +105,7 @@ Code_v1/
 
 ## Code_v2: Multi-Path Incremental-$\beta$ Information Bottleneck
 
-*(Based on the `Code_v2_Multi_Path/` repository)*
+*(Based on the `code_v2_Multi_Path/` repository)*
 
 This second-stage implementation introduces the **Multi-Path Incremental-$\beta$ Optimization Strategy**. It addresses convergence failures observed in standard single-path iterative methods, particularly under conditions of partial correlation or noise. Code_v2 aims for enhanced stability, relevance preservation, and smoother traversal through critical $\beta$ regions, preventing premature collapse to trivial encoders that Code_v1 might experience under certain conditions.
 
@@ -121,7 +121,7 @@ This second-stage implementation introduces the **Multi-Path Incremental-$\beta$
 ### 📁 Directory Structure (Code_v2)
 
 ```
-Code_v2_Multi_Path/
+code_v2_Multi_Path/
 ├── multi_path_ib.py            # Core multi-path IB framework
 ├── paper/
 │   └── enhanced_ib_framework.pdf # Associated paper (reflecting Code_v2 advancements)
@@ -159,7 +159,7 @@ Output will include:
 
 ---
 
-## 🔄 Improvements: Code_v1 vs. Code_v2_Multi_Path
+## 🔄 Improvements: Code_v1 vs. code_v2_Multi_Path
 
 | Feature                         | Code_v1 (Validation Framework)         | Code_v2 (Multi-Path Framework)         |
 |---------------------------------|----------------------------------------|----------------------------------------|
@@ -191,7 +191,7 @@ Output will include:
 
 ## 📜 Citation
 
-Users referencing this repository or the associated research in academic or professional contexts should employ the following citation format:
+Users referencing this repository, its code (either Code_v1 or Code_v2), or the associated research in academic or professional contexts should cite the following publication. This paper details the theoretical analysis and findings that are implemented and validated across the different versions of the codebase presented here:
 
 ```bibtex
 @article{alpay2025beta,
@@ -202,7 +202,6 @@ Users referencing this repository or the associated research in academic or prof
   doi     = {10.22541/au.174664105.57850297/v1},
   url     = {[https://doi.org/10.22541/au.174664105.57850297/v1](https://doi.org/10.22541/au.174664105.57850297/v1)}
 }
-```
 
 ---
 
