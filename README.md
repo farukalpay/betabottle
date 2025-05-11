@@ -91,7 +91,6 @@ Code_v1/
 │   └── statistical_validation.png
 ├── paper/
 │   └── enhanced_ib_framework.pdf # Formal manuscript (relevant to Code_v1 context)
-├── README.md                   # Original README for Code_v1
 ├── validate_beta_star.py       # Core β* validation script for Code_v1
 ```
 
