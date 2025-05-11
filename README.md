@@ -91,7 +91,6 @@ Code_v1/
 │   └── statistical_validation.png
 ├── paper/
 │   └── enhanced_ib_framework.pdf # Formal manuscript (relevant to Code_v1 context)
-├── LICENSE
 ├── README.md                   # Original README for Code_v1
 ├── validate_beta_star.py       # Core β* validation script for Code_v1
 ```
@@ -132,7 +131,6 @@ Code_v2_Multi_Path/
 │   ├── critical_region_beta_trajectories_bsc_corrected.png
 │   ├── multi_path_info_plane_demo_corrected.png
 │   └── multi_path_beta_trajectories_demo_corrected.png
-└── LICENSE                     # MIT License
 ```
 
 ### 📦 Dependencies (Code_v2)
