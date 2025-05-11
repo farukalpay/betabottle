@@ -83,7 +83,7 @@ Generated plots were stored in `ib-beta-star-validation/ib_plots/`:
 ### 📁 Repository Structure (Code_v1)
 
 ```
-ib-beta-star-validation/Code_v1/
+Code_v1/
 ├── ib_plots/                   # Auto-generated plots from Code_v1
 │   ├── multiscale_phase_transition.png
 │   ├── information_plane_dynamics.png
