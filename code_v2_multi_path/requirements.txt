@@ -1,0 +1,17 @@
+# Core Scientific Stack
+numpy>=1.24.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+
+# JAX (CPU version by default; GPU users can modify accordingly)
+jax>=0.4.13
+jaxlib>=0.4.13
+
+# Optional: Symbolic Analysis (used in symbolic extensions or diagnostics)
+sympy>=1.11.0
+
+# Optional: For reproducibility and debugging enhancements
+tqdm>=4.65.0
+
+# Note: If you plan to run on GPU, replace jax and jaxlib with the versions corresponding to your CUDA setup:
+# pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
