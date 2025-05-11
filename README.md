@@ -7,11 +7,17 @@
 This repository contains code and documentation accompanying the manuscript:
 
 **Title:** β-Optimization in the Information Bottleneck Framework: A Theoretical Analysis
+
 **Date:** May 7, 2025
+
 **DOI V1:** [10.22541/au.174664105.57850297/v1](https://doi.org/10.22541/au.174664105.57850297/v1)
+
 **DOI V2:** [10.22541/au.174664105.57850297/v1](https://doi.org/10.22541/au.174664105.57850297/v2)
+
 **Paper V1:** `Code_v1/paper/enhanced_ib_framework.pdf` (contained within version-specific directories)
+
 **Paper V2:** `Code_v2_Multi_Path/paper/enhanced_ib_framework.pdf` (contained within version-specific directories)
+
 The research focuses on the rigorous determination and practical application of the critical parameter $\beta$ in the Information Bottleneck (IB) framework. This repository documents two major stages of the project: an initial validation of the critical phase transition point ($\beta^*$) and an enhanced multi-path optimization strategy.
 
 A key finding of this research is the deterministic identification of the critical phase transition point:
