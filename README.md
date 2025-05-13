@@ -96,7 +96,7 @@ Outputs the figures above and reproduces the BSC & 8×8 experiments (see Figures
 | Convex surrogate (u(t)) | — | — | (t^2) | Adaptive slope |
 | Entropy regulator (ε) | — | — | constant small | Annealed ε(β) |
 | Continuation | — | β-grid multi-path | Predictor-corrector ODE | Arc-length continuation |
-| Dataset scale | 2×2, 8×8 | 2×2, 8×8 | 8x8 | MNIST, CIFAR-10 |
+| Dataset scale | 2×2, 8×8 | 8×8 | 2×2, 8×8 | MNIST, CIFAR-10 |
 | JAX / GPU | — | ✅ | ✅ | ✅+TPU |
 | Package | script | script | demo script | pip package |
 | Proof rigor | β* lemma | empirical | convexity lemma | full theorem set |
