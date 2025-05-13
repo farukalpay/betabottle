@@ -1,220 +1,144 @@
-# β-Optimization in the Information Bottleneck Framework
-
+# β-Optimization in the Information Bottleneck Framework  
 [![ORCID](https://img.shields.io/badge/ORCID-0009--0009--2207--6528-brightgreen)](https://orcid.org/0009-0009-2207-6528)
 
 **Author:** Faruk Alpay
 
-This repository contains code and documentation accompanying the manuscript:
+| Version | Title | Date | DOI / License |
+|---------|-------|------|---------------|
+| **V1** | *β-Optimization in the Information Bottleneck Framework: A Theoretical Analysis* | 7 – 11 May 2025 | 10.22541/au.174664105.57850297 / MIT |
+| **V2** | *β-Optimization … Multi-Path Extension* | 12 – 27 May 2025 | 10.5281/zenodo.15384382 / MIT |
+| **V3 (current)** | *Stable and Convexified Information Bottleneck Optimization via Symbolic Continuation and Entropy-Regularized Trajectories* | ≥ 12 May 2025 | 10.13140/RG.2.2.12135.15521 / CC-BY-4.0 |
+| **V4 (planned)** | *Proof-Tight & Large-Scale Continuation IB* | Q4 2025 (target) | T B A |
 
-**Title:** β-Optimization in the Information Bottleneck Framework: A Theoretical Analysis
-
-**Date:** May 7, 2025 - May 11, 2025
-
-**DOI V1:** [10.22541/au.174664105.57850297/v1](https://doi.org/10.22541/au.174664105.57850297/v1)
-
-**DOI V2:** [10.5281/zenodo.15384382](https://doi.org/10.5281/zenodo.15384382)
-
-**Paper V1:** `Code_v1/paper/enhanced_ib_framework.pdf` (contained within version-specific directories)
-
-**Paper V2:** `code_v2_Multi_Path/paper/enhanced_ib_framework.pdf` (contained within version-specific directories)
-
-The research focuses on the rigorous determination and practical application of the critical parameter $\beta$ in the Information Bottleneck (IB) framework. This repository documents two major stages of the project: an initial validation of the critical phase transition point ($\beta^*$) and an enhanced multi-path optimization strategy.
-
-A key finding of this research is the deterministic identification of the critical phase transition point:
-$$ \beta^* = 4.14144 $$
-This value was originally formulated using Alpay Algebra—a novel symbolic mathematical system optimized for analyzing phase transitions—and subsequently validated using conventional mathematical notation and computational frameworks.
+> **Please cite V3** for new work; older DOIs remain valid for archival purposes.
 
 ---
 
-## 📖 Contents and Evolution
+## ➡️ arXiv endorsement kindly requested  
 
-This project has evolved through two main code versions:
+If you have **≥ 3 arXiv cs.\*** papers since 2020, one click unlocks the cs.LG category for this project:
 
-1.  **Code_v1: Enhanced Information Bottleneck Framework: $\beta^*$-Optimization Validation**
-    * Focus: Initial theoretical and computational validation of the critical $\beta^*$.
-    * [Jump to Code_v1 Details](#code_v1-enhanced-information-bottleneck-framework-beta-optimization-validation)
+1. Sign in at <https://arxiv.org/account/endorse>  
+2. Paste **OCP3Q4** in the *Endorse user* box → **Endorse**
 
-2.  **Code_v2: Multi-Path Incremental-$\beta$ Information Bottleneck**
-    * Focus: An improved method addressing stability and convergence, building upon the findings of Code_v1.
-    * [Jump to Code_v2 Details](#code_v2-multi-path-incremental-beta-information-bottleneck)
+That's it — your click removes the gate for a full year. I'd be delighted to reciprocate or answer any technical questions (PDF lives in `code_v3_Stable_Continuation/paper/`).
 
 ---
 
-## Code_v1: Enhanced Information Bottleneck Framework: $\beta^*$-Optimization Validation
-
-*(Based on the initial implementation, located in the `ib-beta-star-validation/Code_v1/` directory)*
-
-This version presented the first deterministic and fully validated computational framework for identifying the critical phase transition point ($\beta^* = 4.14144$) within the Information Bottleneck (IB) methodology.
-
-### 🎯 Project Overview (Code_v1)
-
-* **Objective:** Precise identification of $\beta^*$ through rigorous theoretical and statistical validation.
-* **Methodology:** Employed advanced methods including multi-stage optimization, symbolic spline detection, and $\Lambda++$ ensemble initialization.
-* **Implementation:** A self-contained Python script (`validate_beta_star.py`) requiring `numpy`, `scipy`, `scikit-learn`, and `matplotlib`.
-* **Nature:** Primarily a computational proof-of-concept for theoretical validation.
-
-### 🛡️ Validation and Verification Protocols (Code_v1)
-
-The `validate_beta_star.py` script rigorously confirmed:
-* Identification of $\beta^*$ within a computational tolerance of < 0.00001% error from the theoretically derived value (4.14144).
-* Successful completion of a stringent validation suite evaluating:
-    * Phase Transition Sharpness
-    * $\Delta$-Violation Verification
-    * Theoretical Alignment
-    * Curve Concavity
-    * Encoder Stability
-    * Information-Theoretic Consistency
-* Comprehensive verification through:
-    * Confidence interval precision
-    * Theoretical alignment with error < 0.01%
-    * Monotonicity checks
-    * Reproducibility across multiple random seeds
-    * Sharpness and clarity of the phase transition
-    * Adherence to theoretical predictions above and below $\beta^*$.
-
-### 📊 Graphical Outputs (Code_v1)
-
-Generated plots were stored in `ib-beta-star-validation/ib_plots/`:
-* `multiscale_phase_transition.png`
-* `information_plane_dynamics.png`
-* `gradient_landscape.png`
-* `statistical_validation.png`
-
-### 📁 Repository Structure (Code_v1)
+## 📂 Repository map
 
 ```
-Code_v1/
-├── ib_plots/                   # Auto-generated plots from Code_v1
-│   ├── multiscale_phase_transition.png
-│   ├── information_plane_dynamics.png
-│   ├── gradient_landscape.png
-│   └── statistical_validation.png
-├── paper/
-│   └── enhanced_ib_framework.pdf # Formal manuscript (relevant to Code_v1 context)
-├── validate_beta_star.py       # Core β* validation script for Code_v1
-├── requirements.txt
+Code_v1/                      # β* validation framework
+code_v2_Multi_Path/           # multi-path incremental-β solver
+code_v3_Stable_Continuation/  # NEW: convex + entropy + continuation
+docs/                         # legacy citations, notes
+LICENSE
+README.md
 ```
 
-### ✨ Significance of Results (Code_v1)
+### Quick PDFs
 
-* Concretely demonstrated the theoretical and practical efficacy of employing Alpay Algebra to pinpoint $\beta^*$.
-* Validated the precise critical value $\beta^* = 4.14144$.
-* Introduced computational techniques like symbolic spline detection and $\Lambda++$ hybrid initialization.
-* Offered enhanced accuracy, comparable or superior to state-of-the-art IB implementations at the time (e.g., DeepBI).
+| Version | Path |
+|---------|------|
+| **V1** | `Code_v1/paper/enhanced_ib_framework.pdf` |
+| **V2** | `code_v2_Multi_Path/paper/enhanced_ib_framework.pdf` |
+| **V3** | `code_v3_Stable_Continuation/paper/stable_convex_ib.pdf` |
 
 ---
 
-## Code_v2: Multi-Path Incremental-$\beta$ Information Bottleneck
+## Code_v3 — Stable Continuation IB (Convex + Entropy)  
 
-*(Based on the `code_v2_Multi_Path/` repository)*
+*(directory `code_v3_Stable_Continuation/`)*
 
-This second-stage implementation introduces the **Multi-Path Incremental-$\beta$ Optimization Strategy**. It addresses convergence failures observed in standard single-path iterative methods, particularly under conditions of partial correlation or noise. Code_v2 aims for enhanced stability, relevance preservation, and smoother traversal through critical $\beta$ regions, preventing premature collapse to trivial encoders that Code_v1 might experience under certain conditions.
+| File | Role |
+|------|------|
+| `stable_continuation_ib.py` | Predictor–corrector solver implementing \(u(t)=t^2\) and small entropy penalty |
+| `requirements.txt` | `numpy`, `scipy`, `jax` (GPU optional), `matplotlib` |
+| `ib_plots/` | `bsc_critical_region.png`, `bsc_phase_transition_detection.png`, `continuation_ib_results.png`, `encoder_comparison.png`, `encoder_evolution.png`, `enhanced_multipath_best_encoder.png`, `enhanced_multipath_beta_trajectories.png`, `enhanced_multipath_convergence.png`, `enhanced_multipath_info_plane.png`, `ib_curve_comparison.png`, `izy_vs_beta_continuation.png` |
+| `paper/stable_convex_ib.pdf` | V3 manuscript (same as DOI) |
 
-### 🚀 Key Features (Code_v2)
+Run the demo:
 
--   **Multi-path evolution:** Parallel paths explore distinct encoder regimes.
--   **Incremental $\beta$ scheduling:** Prevents premature convergence by gradually increasing $\beta$.
--   **Adaptive damping & trimming:** Ensures stable encoder trajectories across the $\beta$-spectrum.
--   **Deterministic convergence:** Reproducible optimization that aligns with theoretical predictions, including the symbolic $\beta^* = 4.14144$ transition.
--   **Refined plots:** Includes information plane and $\beta$-trajectory visualizations for all paths.
--   **JAX acceleration:** Utilizes `jax` for improved computational performance.
-
-### 📁 Directory Structure (Code_v2)
-
-```
-code_v2_Multi_Path/
-├── multi_path_ib.py            # Core multi-path IB framework
-├── requirements.txt
-├── paper/
-│   └── enhanced_ib_framework.pdf # Associated paper (reflecting Code_v2 advancements)
-├── ib_plots/                   # Auto-generated plots from Code_v2
-│   ├── critical_region_info_plane_bsc_corrected.png
-│   ├── critical_region_beta_trajectories_bsc_corrected.png
-│   ├── multi_path_info_plane_demo_corrected.png
-│   └── multi_path_beta_trajectories_demo_corrected.png
-```
-
-### 📦 Dependencies (Code_v2)
-
--   Python 3.8+
--   `jax` (with GPU support recommended)
--   `numpy`
--   `scipy`
--   `matplotlib`
-
-Install with:
 ```bash
-pip install jax jaxlib numpy scipy matplotlib
+python code_v3_Stable_Continuation/stable_continuation_ib.py 
 ```
 
-### 🧪 Example Usage (Code_v2)
-
-To run the full demonstration for Code_v2 (including visualizations):
-```bash
-python Code_v2_Multi_Path/run_demo.py
-```
-Output will include:
-* Multi-path evolution over the $\beta$ range.
-* Critical $\beta^*$ convergence plots.
-* Info plane trajectory visualizations.
-* Comparative logs vs. standard IB baseline.
+Outputs the figures above and reproduces the BSC & 8×8 experiments (see Figures 1–5 in the PDF).
 
 ---
 
-## 🔄 Improvements: Code_v1 vs. code_v2_Multi_Path
+## 🔄 Improvements: Version Comparison
 
-| Feature                         | Code_v1 (Validation Framework)         | Code_v2 (Multi-Path Framework)         |
-|---------------------------------|----------------------------------------|----------------------------------------|
-| **Primary Goal** | Validate symbolic $\beta^*$ (4.14144)  | Robust IB optimization across $\beta$ spectrum |
-| $\beta$ Scheduling              | Static / Focused on $\beta^*$          | Incremental & adaptive                 |
-| Encoder Collapse Prevention   | Less emphasis, potential for collapse  | ✅ Multi-path stability                |
-| Critical $\beta^*$ Detection    | Deterministic, high-precision          | Convergent & reproducible (validates $\beta^*$) |
-| Information Plane Path Tracking | Basic dynamics plot                    | ✅ Multi-path plot support             |
-| Damping & Stabilization       | Implicit or fixed                      | Adaptive per path                      |
-| Noise/Partial Correlation       | Not explicitly addressed               | Designed for robustness under these conditions |
-| Core Algorithm                  | Multi-stage opt, symbolic splines      | Multi-path incremental evolution       |
-| **Dependencies** | numpy, scipy, scikit-learn, matplotlib | numpy, scipy, matplotlib, **jax, jaxlib** |
-| JAX Acceleration                | ❌ No                                  | ✅ Yes                                 |
-| Plot Generation                 | Validation-focused                     | Full $\beta$-dynamics + multi-path info plane |
+### Code_v1 vs. code_v2_Multi_Path vs. code_v3_Stable_Continuation
+| Feature                         | Code_v1 (Validation Framework)         | Code_v2 (Multi-Path Framework)         | Code_v3 (Stable Continuation)          |
+|---------------------------------|----------------------------------------|----------------------------------------|----------------------------------------|
+| **Primary Goal** | Validate symbolic $\beta^*$ (4.14144)  | Prevent encoder collapse & robust IB optimization across $\beta$ spectrum | Eliminate phase jumps via symbolic continuation & convexification |
+| $\beta$ Scheduling              | Static / Focused on $\beta^*$          | Incremental & adaptive with gradual increase | Predictor-corrector ODE with continuation |
+| Encoder Collapse Prevention     | Structural KL convergence criteria     | ✅ Multi-path stability (multiple parallel solutions) | ✅ Entropy regularization + convex surrogate |
+| Critical $\beta^*$ Detection    | Deterministic, high-precision          | Multi-method estimation with gradient tracking | Guaranteed via Hessian eigenvalue monitoring |
+| Information Plane Path Tracking | Basic dynamics plot                    | Multi-path visualization with solution trajectories | Continuous trajectory & bifurcation visualization |
+| Damping & Stabilization         | Adaptive based on convergence behavior | Adaptive per path with local iterations | ✅ Automatic via ODE continuation |
+| Convex Surrogate Function       | ❌ None                                | ❌ None                                | ✅ $u(t)=t^2$ |
+| Entropy Regularization          | ❌ None                                | ❌ None                                | ✅ Constant small $\varepsilon$ |
+| Bifurcation Handling            | ❌ Limited                             | Path selection & merging               | ✅ Explicit detection via Hessian eigenvalues |
+| Core Algorithm                  | Staged optimization, symbolic β*       | JIT-compiled multi-path incremental evolution | Predictor-corrector ODE with implicit function continuation |
+| **Dependencies** | numpy, scipy, scikit-learn, matplotlib | numpy, scipy, matplotlib, **jax, jaxlib**, (sympy optional) | numpy, scipy, **jax, jaxlib**, matplotlib |
+| JAX Acceleration                | ❌ No                                  | ✅ Yes (JIT-compiled core functions)   | ✅ Yes (64-bit precision enabled) |
+| Visualization                   | Static plots, convergence tracking     | Solution paths, β trajectories, multi-path info plane | Solution trajectories & bifurcation visualization |
 
 ---
 
-## 🧠 General Notes & Future Directions
+## 🔄 Improvements across versions
 
-* **Theoretical Validation:** Both codebase versions serve primarily as computational proof-of-concept and theoretical validation frameworks rather than general-purpose libraries. They aim to accurately reproduce theoretical findings, particularly the symbolic $\beta^* = 4.14144$ transition, and test encoder stability.
-* **Alpay Algebra:** The underlying theoretical insights from Alpay Algebra drive the methodologies. These repositories serve as groundwork for future, potentially more user-friendly, Alpay Algebra–driven IB modules.
-* **Development Focus:**
-    * (Done in v1) Rigorously validate $\beta^*$.
-    * (Focus of v2) Enhance stability and practical convergence across a range of $\beta$ values and data conditions.
-    * (Future) Develop and release a modular IB framework based on Alpay Algebra for broader computational research.
-* **Publication:** Findings and associated validation data are intended for dissemination, e.g., via preprint platforms (arXiv categories `cs.IT` or `math.IT`).
+| Feature | V1 | V2 | V3 | V4 (planned) |
+|---------|----|----|----|--------------| 
+| Goal | β* proof | Multi-path robustness | Eliminate phase jumps | Proof-tight, large-scale |
+| Convex surrogate (u(t)) | — | — | (t^2) | Adaptive slope |
+| Entropy regulator (ε) | — | — | constant small | Annealed ε(β) |
+| Continuation | — | β-grid multi-path | Predictor-corrector ODE | Arc-length continuation |
+| Dataset scale | 2×2, 8×8 | 8×8 | 8x8 | MNIST, CIFAR-10 |
+| JAX / GPU | — | ✅ | ✅ | ✅+TPU |
+| Package | script | script | demo script | pip package |
+| Proof rigor | β* lemma | empirical | convexity lemma | full theorem set |
+| Target venue | Authorea | Zenodo | arXiv | Springer-Nature |
+
+---
+
+## 🔮 v4 Roadmap (Q4 2025)
+
+- Full formal proof of global convexity + uniqueness.
+- Adaptive entropy schedule linked to Hessian condition number.
+- Gaussian/Variational IB demo on MNIST & CIFAR-10.
+- Arc-length continuation for automatic step control.
+- Package ib-continuation on PyPI with CLI ib-trace.
+- Submit Springer-Nature manuscript (sn-article.cls).
 
 ---
 
 ## 📜 Citation
 
-Users referencing this repository, its code (either Code_v1 or Code_v2), or the associated research in academic or professional contexts should cite the following publication. This paper details the theoretical analysis and findings that are implemented and validated across the different versions of the codebase presented here:
-
-```bibtex
-@article{alpay2025beta,
+```
+@article{alpay2025stableIB,
   author  = {Faruk Alpay},
-  title   = {{\textgreek{b}}-Optimization in the Information Bottleneck Framework: A Theoretical Analysis},
-  journal = {Authorea},
+  title   = {Stable and Convexified Information Bottleneck Optimization via Symbolic Continuation and Entropy-Regularized Trajectories},
   year    = {2025},
-  doi     = {10.22541/au.174664105.57850297/v1},
-  url     = {[https://doi.org/10.22541/au.174664105.57850297/v1](https://doi.org/10.22541/au.174664105.57850297/v1)}
+  doi     = {10.13140/RG.2.2.12135.15521},
+  note    = {Version 3. Please cite this version unless a newer DOI is available},
+  url     = {https://doi.org/10.13140/RG.2.2.12135.15521}
 }
 ```
----
 
-## 📄 Licensing
-
-This project is distributed under the **MIT License**, permitting unrestricted academic and educational use. Commercial inquiries should be directed to the author. See the `LICENSE` file in the respective code directories for details.
+(Legacy BibTeX for V1 and V2 lives in docs/old_citations.bib.)
 
 ---
 
-## 📬 Contact Information
+## 📄 License
 
-**Faruk Alpay**
-* ORCID: [https://orcid.org/0009-0009-2207-6528](https://orcid.org/0009-0009-2207-6528)
-* Email: alpay@lightcap.ai
+MIT for academic/educational use.
+Commercial enquiries → alpay@lightcap.ai
+
+---
+
+## 📬 Contact
+
+Faruk Alpay · ORCID 0009-0009-2207-6528 · alpay@lightcap.ai
