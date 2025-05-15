@@ -14,17 +14,6 @@
 
 ---
 
-## ➡️ arXiv endorsement kindly requested  
-
-If you have **≥ 3 arXiv cs.\*** papers since 2020, one click unlocks the cs.LG category for this project:
-
-1. Sign in at <https://arxiv.org/account/endorse>  
-2. Paste **OCP3Q4** in the *Endorse user* box → **Endorse**
-
-That's it — your click removes the gate for a full year. I'd be delighted to reciprocate or answer any technical questions (PDF lives in `code_v3_Stable_Continuation/paper/`).
-
----
-
 ## 📂 Repository map
 
 ```
@@ -121,10 +110,10 @@ Outputs the figures above and reproduces the BSC & 8×8 experiments (see Figures
 @article{alpay2025stableIB,
   author  = {Faruk Alpay},
   title   = {Stable and Convexified Information Bottleneck Optimization via Symbolic Continuation and Entropy-Regularized Trajectories},
+  journal = {arXiv preprint arXiv:2505.09239},
   year    = {2025},
-  doi     = {10.13140/RG.2.2.12135.15521},
-  note    = {Version 3. Please cite this version unless a newer DOI is available},
-  url     = {https://doi.org/10.13140/RG.2.2.12135.15521}
+  note    = {Version 1. Please cite this version unless a newer version appears on arXiv},
+  url     = {https://doi.org/10.48550/arXiv.2505.09239}
 }
 ```
 
