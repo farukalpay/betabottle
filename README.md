@@ -5,9 +5,9 @@
 
 | Version | Title | Date | DOI / License |
 |---------|-------|------|---------------|
-| **V1** | *β-Optimization in the Information Bottleneck Framework: A Theoretical Analysis* | 7 – 11 May 2025 | arXiv:2505.09239 / MIT |
+| **V1** | *β-Optimization in the Information Bottleneck Framework: A Theoretical Analysis* | 7 – 11 May 2025 | 10.22541/au.174664105.57850297 / MIT |
 | **V2** | *β-Optimization … Multi-Path Extension* | 12 – 27 May 2025 | 10.5281/zenodo.15384382 / MIT |
-| **V3 (current)** | *Stable and Convexified Information Bottleneck Optimization via Symbolic Continuation and Entropy-Regularized Trajectories* | ≥ 12 May 2025 | 10.13140/RG.2.2.12135.15521 / CC-BY-4.0 |
+| **V3 (current)** | *Stable and Convexified Information Bottleneck Optimization via Symbolic Continuation and Entropy-Regularized Trajectories* | ≥ 12 May 2025 | arXiv:2505.09239 / arXiv Non-Exclusive Distribution License |
 | **V4 (planned)** | *Proof-Tight & Large-Scale Continuation IB* | Q4 2025 (target) | T B A |
 
 > **Please cite V3** for new work; older DOIs remain valid for archival purposes.
