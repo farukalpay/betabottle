@@ -107,13 +107,14 @@ Outputs the figures above and reproduces the BSC & 8×8 experiments (see Figures
 ## 📜 Citation
 
 ```
-@article{alpay2025stableIB,
-  author  = {Faruk Alpay},
-  title   = {Stable and Convexified Information Bottleneck Optimization via Symbolic Continuation and Entropy-Regularized Trajectories},
-  journal = {arXiv preprint arXiv:2505.09239},
-  year    = {2025},
-  note    = {Version 1. Please cite this version unless a newer version appears on arXiv},
-  url     = {https://doi.org/10.48550/arXiv.2505.09239}
+@misc{alpay2025stableconvexifiedinformationbottleneck,
+      title={Stable and Convexified Information Bottleneck Optimization via Symbolic Continuation and Entropy-Regularized Trajectories}, 
+      author={Faruk Alpay},
+      year={2025},
+      eprint={2505.09239},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2505.09239}, 
 }
 ```
 
